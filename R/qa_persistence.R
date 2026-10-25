@@ -3,23 +3,17 @@
 #' Save a QA log to disk
 #'
 #' This helper saves a QA log tibble, as produced by [log_rag_interaction()],
-#' to an RDS file. The output path must be supplied explicitly.
+#' to an RDS file. By default, it writes to `db/qa_log.rds` inside the
+#' project directory.
 #'
 #' @param qa_log A tibble created by [qa_log_empty()] and populated by
 #'   [log_rag_interaction()].
-#' @param path Character scalar; path to the RDS file.
+#' @param path Character scalar; path to the RDS file. Defaults to
+#'   `"db/qa_log.rds"`.
 #'
 #' @return Invisibly, the path to the saved file.
-#'
-#' @examples
-#' qa_log <- qa_log_empty()
-#' path <- tempfile(fileext = ".rds")
-#'
-#' save_qa_log(qa_log, path)
-#' file.exists(path)
-#'
 #' @export
-save_qa_log <- function(qa_log, path) {
+save_qa_log <- function(qa_log, path = "db/qa_log.rds") {
   if (!tibble::is_tibble(qa_log)) {
     stop("qa_log must be a tibble.", call. = FALSE)
   }
@@ -41,17 +35,12 @@ save_qa_log <- function(qa_log, path) {
 #' This helper loads a QA log tibble from an RDS file. If the file does
 #' not exist, it returns an empty QA log created by [qa_log_empty()].
 #'
-#' @param path Character scalar; path to the RDS file.
+#' @param path Character scalar; path to the RDS file. Defaults to
+#'   `"db/qa_log.rds"`.
 #'
 #' @return A tibble containing the QA log.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' load_qa_log(path)
-#'
 #' @export
-load_qa_log <- function(path) {
+load_qa_log <- function(path = "db/qa_log.rds") {
   if (!is.character(path) || length(path) != 1L || !nzchar(path)) {
     stop("path must be a single non-empty character string.", call. = FALSE)
   }
@@ -72,23 +61,16 @@ load_qa_log <- function(path) {
 #' Save QA metrics to disk
 #'
 #' This helper saves a QA metrics tibble, as produced by
-#' [compute_ragas_metrics()], to an RDS file. The output path must be
-#' supplied explicitly.
+#' [compute_ragas_metrics()], to an RDS file. By default, it writes to
+#' `db/qa_metrics.rds` inside the project directory.
 #'
 #' @param qa_metrics A tibble created by [compute_ragas_metrics()].
-#' @param path Character scalar; path to the RDS file.
+#' @param path Character scalar; path to the RDS file. Defaults to
+#'   `"db/qa_metrics.rds"`.
 #'
 #' @return Invisibly, the path to the saved file.
-#'
-#' @examples
-#' qa_metrics <- qa_metrics_empty()
-#' path <- tempfile(fileext = ".rds")
-#'
-#' save_qa_metrics(qa_metrics, path)
-#' file.exists(path)
-#'
 #' @export
-save_qa_metrics <- function(qa_metrics, path) {
+save_qa_metrics <- function(qa_metrics, path = "db/qa_metrics.rds") {
   if (!tibble::is_tibble(qa_metrics)) {
     stop("qa_metrics must be a tibble.", call. = FALSE)
   }
@@ -110,17 +92,12 @@ save_qa_metrics <- function(qa_metrics, path) {
 #' This helper loads QA metrics from an RDS file. If the file does not
 #' exist, it returns an empty metrics tibble created by [qa_metrics_empty()].
 #'
-#' @param path Character scalar; path to the RDS file.
+#' @param path Character scalar; path to the RDS file. Defaults to
+#'   `"db/qa_metrics.rds"`.
 #'
 #' @return A tibble containing the QA metrics.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' load_qa_metrics(path)
-#'
 #' @export
-load_qa_metrics <- function(path) {
+load_qa_metrics <- function(path = "db/qa_metrics.rds") {
   if (!is.character(path) || length(path) != 1L || !nzchar(path)) {
     stop("path must be a single non-empty character string.", call. = FALSE)
   }
@@ -144,18 +121,12 @@ load_qa_metrics <- function(path) {
 #' by [qa_log_empty()]. It is intended for starting a fresh evaluation
 #' session.
 #'
-#' @param path Character scalar; path to the QA log RDS file.
+#' @param path Character scalar; path to the QA log RDS file. Defaults to
+#'   `"db/qa_log.rds"`.
 #'
 #' @return Invisibly, the path to the saved file.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' clear_qa_log(path)
-#' load_qa_log(path)
-#'
 #' @export
-clear_qa_log <- function(path) {
+clear_qa_log <- function(path = "db/qa_log.rds") {
   if (!is.character(path) || length(path) != 1L || !nzchar(path)) {
     stop("path must be a single non-empty character string.", call. = FALSE)
   }
@@ -176,18 +147,12 @@ clear_qa_log <- function(path) {
 #' This helper overwrites the QA metrics file with an empty metrics tibble,
 #' as created by [qa_metrics_empty()].
 #'
-#' @param path Character scalar; path to the QA metrics RDS file.
+#' @param path Character scalar; path to the QA metrics RDS file. Defaults to
+#'   `"db/qa_metrics.rds"`.
 #'
 #' @return Invisibly, the path to the saved file.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' clear_qa_metrics(path)
-#' load_qa_metrics(path)
-#'
 #' @export
-clear_qa_metrics <- function(path) {
+clear_qa_metrics <- function(path = "db/qa_metrics.rds") {
   if (!is.character(path) || length(path) != 1L || !nzchar(path)) {
     stop("path must be a single non-empty character string.", call. = FALSE)
   }

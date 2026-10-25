@@ -6,7 +6,6 @@
 \usage{
 ingest_documents(
   paths,
-  vectorstore_path,
   collection = "default",
   chunk_size = 500L,
   chunk_overlap = 50L,
@@ -25,93 +24,65 @@ ingest_documents(
 \arguments{
 \item{paths}{Character vector of file paths to ingest.}
 
-\item{vectorstore_path}{Character scalar; path to the vector-store RDS file.}
-
 \item{collection}{Character scalar; name of the collection.}
 
-\item{chunk_size}{Integer; target chunk size in characters. Used when
-\code{chunking_strategy = "character"}.}
+\item{chunk_size}{Integer; target chunk size (in characters). Used for \code{"character"}.}
 
-\item{chunk_overlap}{Integer; overlap between consecutive chunks. Used when
-\code{chunking_strategy = "character"}.}
+\item{chunk_overlap}{Integer; overlap between consecutive chunks. Used for \code{"character"}.}
 
-\item{chunking_strategy}{Character; either \code{"character"} or \code{"sentence"}.}
+\item{chunking_strategy}{Character; \code{"character"} or \code{"sentence"}.}
 
 \item{embedding_model}{Character; OpenAI embedding model name.}
 
-\item{embedding_batch_size}{Integer; number of chunks per embedding request.
-Internally capped at 256.}
+\item{embedding_batch_size}{Integer; number of chunks per embeddings request.
+Default 128. Internally capped for safety.}
 
-\item{embedding_max_chars}{Integer; maximum number of characters retained
-in each chunk before embedding.}
+\item{embedding_max_chars}{Integer; hard cap (in characters) applied to each chunk
+before embedding to avoid request failures. Default 8000.}
 
-\item{retry}{Logical; whether to retry transient API failures.}
+\item{retry}{Logical; whether to retry transient API failures. Default TRUE.}
 
-\item{max_retries}{Integer; maximum number of retries for each batch.}
+\item{max_retries}{Integer; maximum retries per batch (transient failures). Default 5.}
 
-\item{resume}{Logical; whether to use a checkpoint to skip chunks embedded
-during an earlier run.}
+\item{resume}{Logical; whether to use a local checkpoint to skip chunks already
+embedded in a previous run. Default TRUE.}
 
-\item{checkpoint_path}{Optional character scalar; path to the checkpoint
-RDS file. If \code{NULL}, a temporary file based on the collection name is
-used.}
+\item{checkpoint_path}{Optional character scalar; file path for the resume
+checkpoint. If NULL, uses a temp file based on the collection name.}
 
-\item{use_openai}{Logical; if \code{TRUE}, use OpenAI embeddings. If \code{FALSE},
-use the local dummy embedding generator.}
+\item{use_openai}{Logical; if TRUE, use OpenAI embeddings. If FALSE,
+use a local dummy embedding generator (for offline development / tests).}
 
-\item{verbose}{Logical; whether to display progress messages.}
+\item{verbose}{Logical; if TRUE, log progress messages.}
 }
 \value{
-A tibble containing a per-file ingestion summary with columns
-\code{collection}, \code{path}, and \code{n_chunks}.
+A tibble with a per-file ingestion summary (\code{collection}, \code{path}, \code{n_chunks}).
 }
 \description{
 Reads PDF, DOCX, or TXT files, extracts text, cleans it lightly, chunks it,
-embeds chunks, and stores them in a vector-store collection.
+embeds chunks, and stores them in a vector store collection.
 }
 \details{
 Chunking strategies:
 \itemize{
 \item \code{"character"}: overlapping fixed-size character windows.
-\item \code{"sentence"}: strict sentence splitting via \code{\link[=chunk_text_sentence]{chunk_text_sentence()}}.
+\item \code{"sentence"}: strict sentence splitting via \code{chunk_text_sentence()}.
 }
 
-Cleaning strategy:
+Cleaning strategy (minimal, deterministic):
 \itemize{
 \item Replace carriage returns and newlines with spaces
 \item Remove control characters
-\item Collapse multiple whitespace characters into a single space
-\item Trim leading and trailing whitespace
+\item Collapse multiple whitespace to a single space
+\item Trim leading/trailing whitespace
 }
 
-Embedding strategy:
+Embedding strategy (robust by default):
 \itemize{
-\item Embeddings are computed in batches.
-\item Batches are retried with exponential backoff after transient failures.
-\item A batch is automatically divided after certain request-size failures.
-\item Each chunk is truncated to a specified maximum length before embedding.
-\item Ingestion can optionally be resumed using a local checkpoint file.
+\item Embeddings are computed in batches (default \code{embedding_batch_size = 128})
+\item Batches are retried with exponential backoff on transient failures (e.g., 429/5xx)
+\item If a 400 occurs due to request size, the batch is automatically split
+\item Each chunk is truncated to a safe maximum length before embedding
+\item Optional resumable ingestion via a local checkpoint file
 }
-}
-\examples{
-document_path <- tempfile(fileext = ".txt")
-writeLines(
-  "Retrieval-augmented generation combines retrieval and generation.",
-  document_path
-)
-
-store_path <- tempfile(fileext = ".rds")
-
-result <- ingest_documents(
-  paths = document_path,
-  vectorstore_path = store_path,
-  collection = "example",
-  use_openai = FALSE,
-  resume = FALSE,
-  verbose = FALSE
-)
-
-result
-vectorstore_load(store_path)
-
 }

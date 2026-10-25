@@ -2,39 +2,24 @@
 % Please edit documentation in R/api_handlers.R
 \name{api_ragas_clear_handler}
 \alias{api_ragas_clear_handler}
-\title{API handler: clear RAG evaluation files}
+\title{API handler: clear RAGAS/QA evaluation files}
 \usage{
-api_ragas_clear_handler(qa_log_path, qa_metrics_path, output_dir)
+api_ragas_clear_handler(
+  qa_log_path = "db/qa_log.rds",
+  qa_metrics_path = "db/qa_metrics.rds",
+  output_dir = "reports/ragas"
+)
 }
 \arguments{
-\item{qa_log_path}{Character scalar; path to the question-answering log
-RDS file.}
+\item{qa_log_path}{Character scalar; path to the QA log RDS file.}
 
-\item{qa_metrics_path}{Character scalar; path to the saved metrics RDS file.}
+\item{qa_metrics_path}{Character scalar; path to the QA metrics RDS file.}
 
-\item{output_dir}{Character scalar; directory containing generated report
-files.}
+\item{output_dir}{Character scalar; directory containing RAGAS report files.}
 }
 \value{
-A list containing \code{status} and \code{message}.
+A list with \code{status} and \code{message}.
 }
 \description{
-Clears the saved question-answering log, saved evaluation metrics, and
-generated report directory. All locations must be supplied explicitly.
-}
-\examples{
-qa_log_path <- tempfile(fileext = ".rds")
-qa_metrics_path <- tempfile(fileext = ".rds")
-output_dir <- tempfile()
-
-save_qa_log(qa_log_empty(), qa_log_path)
-save_qa_metrics(qa_metrics_empty(), qa_metrics_path)
-dir.create(output_dir)
-
-api_ragas_clear_handler(
-  qa_log_path = qa_log_path,
-  qa_metrics_path = qa_metrics_path,
-  output_dir = output_dir
-)
-
+Clears the saved QA log, QA metrics file, and generated RAGAS report files.
 }

@@ -3,80 +3,49 @@
 #' Ingest documents into the vector store
 #'
 #' Reads PDF, DOCX, or TXT files, extracts text, cleans it lightly, chunks it,
-#' embeds chunks, and stores them in a vector-store collection.
+#' embeds chunks, and stores them in a vector store collection.
 #'
 #' Chunking strategies:
-#'
 #' - `"character"`: overlapping fixed-size character windows.
-#' - `"sentence"`: strict sentence splitting via [chunk_text_sentence()].
+#' - `"sentence"`: strict sentence splitting via `chunk_text_sentence()`.
 #'
-#' Cleaning strategy:
-#'
+#' Cleaning strategy (minimal, deterministic):
 #' - Replace carriage returns and newlines with spaces
 #' - Remove control characters
-#' - Collapse multiple whitespace characters into a single space
-#' - Trim leading and trailing whitespace
+#' - Collapse multiple whitespace to a single space
+#' - Trim leading/trailing whitespace
 #'
-#' Embedding strategy:
-#'
-#' - Embeddings are computed in batches.
-#' - Batches are retried with exponential backoff after transient failures.
-#' - A batch is automatically divided after certain request-size failures.
-#' - Each chunk is truncated to a specified maximum length before embedding.
-#' - Ingestion can optionally be resumed using a local checkpoint file.
+#' Embedding strategy (robust by default):
+#' - Embeddings are computed in batches (default `embedding_batch_size = 128`)
+#' - Batches are retried with exponential backoff on transient failures (e.g., 429/5xx)
+#' - If a 400 occurs due to request size, the batch is automatically split
+#' - Each chunk is truncated to a safe maximum length before embedding
+#' - Optional resumable ingestion via a local checkpoint file
 #'
 #' @param paths Character vector of file paths to ingest.
-#' @param vectorstore_path Character scalar; path to the vector-store RDS file.
 #' @param collection Character scalar; name of the collection.
-#' @param chunk_size Integer; target chunk size in characters. Used when
-#'   `chunking_strategy = "character"`.
-#' @param chunk_overlap Integer; overlap between consecutive chunks. Used when
-#'   `chunking_strategy = "character"`.
-#' @param chunking_strategy Character; either `"character"` or `"sentence"`.
+#' @param chunk_size Integer; target chunk size (in characters). Used for `"character"`.
+#' @param chunk_overlap Integer; overlap between consecutive chunks. Used for `"character"`.
+#' @param chunking_strategy Character; `"character"` or `"sentence"`.
 #' @param embedding_model Character; OpenAI embedding model name.
-#' @param embedding_batch_size Integer; number of chunks per embedding request.
-#'   Internally capped at 256.
-#' @param embedding_max_chars Integer; maximum number of characters retained
-#'   in each chunk before embedding.
-#' @param retry Logical; whether to retry transient API failures.
-#' @param max_retries Integer; maximum number of retries for each batch.
-#' @param resume Logical; whether to use a checkpoint to skip chunks embedded
-#'   during an earlier run.
-#' @param checkpoint_path Optional character scalar; path to the checkpoint
-#'   RDS file. If `NULL`, a temporary file based on the collection name is
-#'   used.
-#' @param use_openai Logical; if `TRUE`, use OpenAI embeddings. If `FALSE`,
-#'   use the local dummy embedding generator.
-#' @param verbose Logical; whether to display progress messages.
+#' @param embedding_batch_size Integer; number of chunks per embeddings request.
+#'   Default 128. Internally capped for safety.
+#' @param embedding_max_chars Integer; hard cap (in characters) applied to each chunk
+#'   before embedding to avoid request failures. Default 8000.
+#' @param retry Logical; whether to retry transient API failures. Default TRUE.
+#' @param max_retries Integer; maximum retries per batch (transient failures). Default 5.
+#' @param resume Logical; whether to use a local checkpoint to skip chunks already
+#'   embedded in a previous run. Default TRUE.
+#' @param checkpoint_path Optional character scalar; file path for the resume
+#'   checkpoint. If NULL, uses a temp file based on the collection name.
+#' @param use_openai Logical; if TRUE, use OpenAI embeddings. If FALSE,
+#'   use a local dummy embedding generator (for offline development / tests).
+#' @param verbose Logical; if TRUE, log progress messages.
 #'
-#' @return A tibble containing a per-file ingestion summary with columns
-#'   `collection`, `path`, and `n_chunks`.
-#'
-#' @examples
-#' document_path <- tempfile(fileext = ".txt")
-#' writeLines(
-#'   "Retrieval-augmented generation combines retrieval and generation.",
-#'   document_path
-#' )
-#'
-#' store_path <- tempfile(fileext = ".rds")
-#'
-#' result <- ingest_documents(
-#'   paths = document_path,
-#'   vectorstore_path = store_path,
-#'   collection = "example",
-#'   use_openai = FALSE,
-#'   resume = FALSE,
-#'   verbose = FALSE
-#' )
-#'
-#' result
-#' vectorstore_load(store_path)
-#'
+#' @return A tibble with a per-file ingestion summary (`collection`, `path`, `n_chunks`).
 #' @export
 ingest_documents <- function(
   paths,
-  vectorstore_path,
   collection            = "default",
   chunk_size            = 500L,
   chunk_overlap         = 50L,
@@ -96,74 +65,19 @@ ingest_documents <- function(
   if (!is.character(paths) || length(paths) == 0L) {
     stop("paths must be a non-empty character vector.", call. = FALSE)
   }
-
-  if (
-    missing(vectorstore_path) ||
-      !is.character(vectorstore_path) ||
-      length(vectorstore_path) != 1L ||
-      is.na(vectorstore_path) ||
-      !nzchar(vectorstore_path)
-  ) {
-    stop(
-      "vectorstore_path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
-  if (
-    !is.character(collection) ||
-      length(collection) != 1L ||
-      is.na(collection) ||
-      !nzchar(collection)
-  ) {
-    stop(
-      "collection must be a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
-  if (
-    !is.numeric(chunk_size) ||
-      length(chunk_size) != 1L ||
-      is.na(chunk_size) ||
-      chunk_size <= 0
-  ) {
+  if (!is.numeric(chunk_size) || length(chunk_size) != 1L || chunk_size <= 0) {
     stop("chunk_size must be a positive number.", call. = FALSE)
   }
-
-  if (
-    !is.numeric(chunk_overlap) ||
-      length(chunk_overlap) != 1L ||
-      is.na(chunk_overlap) ||
-      chunk_overlap < 0
-  ) {
+  if (!is.numeric(chunk_overlap) || length(chunk_overlap) != 1L || chunk_overlap < 0) {
     stop("chunk_overlap must be a non-negative number.", call. = FALSE)
   }
-
-  if (
-    !is.numeric(embedding_batch_size) ||
-      length(embedding_batch_size) != 1L ||
-      is.na(embedding_batch_size) ||
-      embedding_batch_size <= 0
-  ) {
+  if (!is.numeric(embedding_batch_size) || length(embedding_batch_size) != 1L || embedding_batch_size <= 0) {
     stop("embedding_batch_size must be a positive number.", call. = FALSE)
   }
-
-  if (
-    !is.numeric(embedding_max_chars) ||
-      length(embedding_max_chars) != 1L ||
-      is.na(embedding_max_chars) ||
-      embedding_max_chars <= 0
-  ) {
+  if (!is.numeric(embedding_max_chars) || length(embedding_max_chars) != 1L || embedding_max_chars <= 0) {
     stop("embedding_max_chars must be a positive number.", call. = FALSE)
   }
-
-  if (
-    !is.numeric(max_retries) ||
-      length(max_retries) != 1L ||
-      is.na(max_retries) ||
-      max_retries < 0
-  ) {
+  if (!is.numeric(max_retries) || length(max_retries) != 1L || max_retries < 0) {
     stop("max_retries must be a non-negative number.", call. = FALSE)
   }
 
@@ -173,84 +87,61 @@ ingest_documents <- function(
   embedding_max_chars  <- as.integer(embedding_max_chars)
   max_retries          <- as.integer(max_retries)
 
-  # Keep request payloads manageable.
+  # Safety cap: even if user requests huge batches, keep payload manageable
   embedding_batch_size <- min(embedding_batch_size, 256L)
 
-  if (is.null(checkpoint_path)) {
-    checkpoint_path <- file.path(
-      tempdir(),
-      paste0("ragR_ingest_checkpoint_", collection, ".rds")
-    )
-  } else if (
-    !is.character(checkpoint_path) ||
-      length(checkpoint_path) != 1L ||
-      is.na(checkpoint_path) ||
-      !nzchar(checkpoint_path)
-  ) {
-    stop(
-      "checkpoint_path must be NULL or a single non-empty character string.",
-      call. = FALSE
-    )
+  if (is.null(checkpoint_path) || !nzchar(checkpoint_path)) {
+    checkpoint_path <- file.path(tempdir(), paste0("ragR_ingest_checkpoint_", collection, ".rds"))
   }
 
   all_chunks <- list()
   idx <- 1L
 
   for (p in paths) {
-    if (verbose) {
-      message("Ingesting file: ", p)
-    }
+    if (verbose) message("Ingesting file: ", p)
 
     raw_txt <- extract_text(p)
 
-    # Minimal, deterministic cleaning before chunking.
+    # Minimal, deterministic cleaning before chunking
     txt <- clean_raw_text(raw_txt)
 
     chunks <- switch(
       chunking_strategy,
       character = chunk_text_character(
-        text = txt,
-        chunk_size = chunk_size,
+        text          = txt,
+        chunk_size    = chunk_size,
         chunk_overlap = chunk_overlap
       ),
       sentence = chunk_text_sentence(text = txt)
     )
 
-    # Normalize chunks defensively.
+    # Normalize chunks defensively
     chunks <- unlist(chunks, use.names = FALSE)
     chunks <- as.character(chunks)
     chunks <- trimws(chunks)
     chunks <- chunks[nzchar(chunks)]
 
     n_chunks <- length(chunks)
-
     if (n_chunks == 0L) {
-      if (verbose) {
-        message("No chunks produced for file: ", p)
-      }
-
+      if (verbose) message("No chunks produced for file: ", p)
       next
     }
 
     base <- tools::file_path_sans_ext(basename(p))
-    ids <- sprintf("%s_%04d", base, seq_len(n_chunks))
+    ids  <- sprintf("%s_%04d", base, seq_len(n_chunks))
 
     all_chunks[[idx]] <- tibble::tibble(
-      path = rep(p, n_chunks),
-      collection = rep(collection, n_chunks),
-      id = ids,
+      path        = rep(p, n_chunks),
+      collection  = rep(collection, n_chunks),
+      id          = ids,
       chunk_index = seq_len(n_chunks),
-      text = chunks
+      text        = chunks
     )
-
     idx <- idx + 1L
   }
 
   if (length(all_chunks) == 0L) {
-    stop(
-      "No chunks were generated from the provided paths.",
-      call. = FALSE
-    )
+    stop("No chunks were generated from the provided paths.", call. = FALSE)
   }
 
   chunks_df <- dplyr::bind_rows(all_chunks)
@@ -260,177 +151,117 @@ ingest_documents <- function(
     message("Embedding model: ", embedding_model)
     message("Embedding batch size: ", embedding_batch_size)
     message("Embedding max chars per chunk: ", embedding_max_chars)
-    message(
-      "Resume: ",
-      if (resume) "TRUE" else "FALSE",
-      " (checkpoint: ",
-      checkpoint_path,
-      ")"
-    )
+    message("Resume: ", if (resume) "TRUE" else "FALSE",
+            " (checkpoint: ", checkpoint_path, ")")
   }
 
-  # Prepare checkpoint for resumable ingestion.
+  # Prepare checkpoint (resumable ingestion)
   already_done_ids <- character(0L)
-
   if (resume && file.exists(checkpoint_path)) {
-    ck <- tryCatch(
-      readRDS(checkpoint_path),
-      error = function(e) NULL
-    )
-
-    if (is.character(ck)) {
-      already_done_ids <- ck
-    }
-
+    ck <- tryCatch(readRDS(checkpoint_path), error = function(e) NULL)
+    if (is.character(ck)) already_done_ids <- ck
     if (verbose && length(already_done_ids) > 0L) {
-      message(
-        "Checkpoint loaded. Already embedded chunks: ",
-        length(already_done_ids)
-      )
+      message("Checkpoint loaded. Already embedded chunks: ", length(already_done_ids))
     }
   }
 
-  # Remove chunks already embedded according to the local checkpoint.
+  # Remove chunks already embedded (based on local checkpoint)
   if (resume && length(already_done_ids) > 0L) {
-    chunks_df <- chunks_df[
-      !(chunks_df$id %in% already_done_ids),
-      ,
-      drop = FALSE
-    ]
-
-    if (verbose) {
-      message("Chunks remaining after resume-skip: ", nrow(chunks_df))
-    }
+    chunks_df <- chunks_df[!(chunks_df$id %in% already_done_ids), , drop = FALSE]
+    if (verbose) message("Chunks remaining after resume-skip: ", nrow(chunks_df))
   }
 
   if (nrow(chunks_df) == 0L) {
-    if (verbose) {
-      message(
-        "Nothing to ingest; all chunks were already embedded ",
-        "according to the checkpoint."
-      )
-    }
-
+    if (verbose) message("Nothing to ingest (all chunks were already embedded per checkpoint).")
+    # Return original per-file summary (based on all chunks)
     summary_df <- dplyr::bind_rows(all_chunks) |>
       dplyr::count(path, name = "n_chunks") |>
       dplyr::mutate(collection = collection, .before = 1)
-
     return(summary_df)
   }
 
-  # Clean and truncate chunks before embedding.
-  truncated_count <- 0L
-
+  # Clean + truncate chunks for embeddings
+  trunc_stats <- list(truncated = 0L)
   chunks_df$text <- vapply(
     chunks_df$text,
     FUN = function(x) {
       y <- clean_text_for_embeddings(x)
-
       if (nchar(y) > embedding_max_chars) {
-        truncated_count <<- truncated_count + 1L
+        trunc_stats$truncated <- trunc_stats$truncated + 1L
         y <- substr(y, 1L, embedding_max_chars)
       }
-
       y
     },
     FUN.VALUE = character(1L),
     USE.NAMES = FALSE
   )
-
-  if (verbose && truncated_count > 0L) {
-    message("Truncated chunks for embedding: ", truncated_count)
+  if (verbose && trunc_stats$truncated > 0L) {
+    message("Truncated chunks for embedding: ", trunc_stats$truncated)
   }
 
-  # Ingest in batches so completed batches persist if a later batch fails.
+  # Ingest in batches so progress persists even if a later batch fails
   n_total <- nrow(chunks_df)
-
-  batch_starts <- seq.int(
-    from = 1L,
-    to = n_total,
-    by = embedding_batch_size
-  )
+  batch_starts <- seq.int(1L, n_total, by = embedding_batch_size)
 
   for (b in seq_along(batch_starts)) {
     start_i <- batch_starts[[b]]
-    end_i <- min(start_i + embedding_batch_size - 1L, n_total)
+    end_i   <- min(start_i + embedding_batch_size - 1L, n_total)
 
     batch_df <- chunks_df[start_i:end_i, , drop = FALSE]
+    if (verbose) message(sprintf("Embedding batch %d/%d (%d chunks)",
+                                 b, length(batch_starts), nrow(batch_df)))
 
-    if (verbose) {
-      message(
-        sprintf(
-          "Embedding batch %d/%d (%d chunks)",
-          b,
-          length(batch_starts),
-          nrow(batch_df)
-        )
-      )
-    }
-
+    # Compute embeddings (batched + retry + auto-split on 400)
     if (use_openai) {
       if (!exists("get_openai_embeddings", mode = "function")) {
-        stop(
-          paste0(
-            "OpenAI embedding helper not found: expected ",
-            "`get_openai_embeddings()`."
-          ),
-          call. = FALSE
-        )
+        stop("OpenAI embedding helper not found: expected `get_openai_embeddings()`.", call. = FALSE)
       }
 
       embeddings <- embed_texts_batched(
-        texts = batch_df$text,
-        model = embedding_model,
-        retry = retry,
-        max_retries = max_retries,
-        verbose = verbose
+        texts           = batch_df$text,
+        model           = embedding_model,
+        retry           = retry,
+        max_retries     = max_retries,
+        verbose         = verbose
       )
     } else {
-      if (verbose) {
-        message("Using dummy embeddings; no OpenAI call will be made.")
-      }
-
-      embeddings <- dummy_embeddings(
-        batch_df$text,
-        dims = 16L
-      )
+      if (verbose) message("Using dummy embeddings (no OpenAI call).")
+      embeddings <- dummy_embeddings(batch_df$text, dims = 16L)
     }
 
-    metadatas <- lapply(
-      seq_len(nrow(batch_df)),
-      function(i) {
-        list(
-          path = batch_df$path[i],
-          collection = batch_df$collection[i],
-          chunk_index = batch_df$chunk_index[i],
-          chunking_strategy = chunking_strategy
-        )
-      }
-    )
+    # Metadata
+    metadatas <- lapply(seq_len(nrow(batch_df)), function(i) {
+      list(
+        path              = batch_df$path[i],
+        collection        = batch_df$collection[i],
+        chunk_index       = batch_df$chunk_index[i],
+        chunking_strategy = chunking_strategy
+      )
+    })
 
-    # Upsert this batch immediately for incremental and resumable ingestion.
+    # Upsert this batch immediately (incremental / resumable)
     vectorstore_upsert(
       collection = collection,
-      ids = batch_df$id,
+      ids        = batch_df$id,
       embeddings = embeddings,
-      documents = batch_df$text,
-      metadatas = metadatas,
-      path = vectorstore_path
+      documents  = batch_df$text,
+      metadatas  = metadatas
     )
 
+    # Update checkpoint
     if (resume) {
       already_done_ids <- c(already_done_ids, batch_df$id)
-
-      tryCatch(
-        saveRDS(unique(already_done_ids), checkpoint_path),
-        error = function(e) NULL
-      )
+      # Write atomically-ish (best effort)
+      tryCatch(saveRDS(unique(already_done_ids), checkpoint_path), error = function(e) NULL)
     }
   }
 
-  dplyr::bind_rows(all_chunks) |>
+  # Final per-file summary (based on all chunks originally generated)
+  summary_df <- dplyr::bind_rows(all_chunks) |>
     dplyr::count(path, name = "n_chunks") |>
     dplyr::mutate(collection = collection, .before = 1)
+
+  summary_df
 }
 
 # --- Text cleaning helpers ----------------------------------------------------
@@ -643,16 +474,6 @@ chunk_text_character <- function(text, chunk_size = 500L, chunk_overlap = 50L) {
 #' @param text Character scalar.
 #'
 #' @return Character vector; one sentence per element.
-#'
-#' @examples
-#' text <- paste(
-#'   "Retrieval-augmented generation retrieves relevant information.",
-#'   "The retrieved information is then supplied to a language model.",
-#'   "This can help produce more grounded responses."
-#' )
-#'
-#' chunk_text_sentence(text)
-#'
 #' @export
 chunk_text_sentence <- function(text) {
   if (!is.character(text) || length(text) != 1L) {

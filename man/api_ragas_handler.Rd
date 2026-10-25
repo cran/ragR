@@ -2,31 +2,20 @@
 % Please edit documentation in R/api_handlers.R
 \name{api_ragas_handler}
 \alias{api_ragas_handler}
-\title{API handler: compute RAG evaluation metrics}
+\title{API handler: compute RAGAS metrics and summary from saved QA log}
 \usage{
-api_ragas_handler(path, judge_model = "gpt-4o-mini")
+api_ragas_handler(path = "db/qa_log.rds", judge_model = "gpt-4o-mini")
 }
 \arguments{
-\item{path}{Character scalar; path to the QA log RDS file.}
+\item{path}{Character scalar; path to the QA log RDS file. Defaults to
+\code{"db/qa_log.rds"}.}
 
-\item{judge_model}{Character scalar; large language model used to score the
-evaluation metrics.}
+\item{judge_model}{Character scalar; judge model used for LLM-scored metrics.
+Defaults to \code{"gpt-4o-mini"}.}
 }
 \value{
-A list containing \code{status}, \code{n_qa}, \code{metrics}, and \code{summary}.
+A list with \code{status}, \code{n_qa}, \code{metrics}, \code{summary}.
 }
 \description{
-Loads a saved question-answering log, computes evaluation metrics, and
-returns both the per-interaction metrics and their summary. The QA-log path
-must be supplied explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-save_qa_log(qa_log_empty(), path)
-
-api_ragas_handler(
-  path = path,
-  judge_model = "gpt-4o-mini"
-)
-
+API handler: compute RAGAS metrics and summary from saved QA log
 }

@@ -4,23 +4,13 @@
 \alias{api_clear_all_handler}
 \title{API handler: clear the entire vector store}
 \usage{
-api_clear_all_handler(vectorstore_path)
-}
-\arguments{
-\item{vectorstore_path}{Character scalar; path to the vector-store RDS file.}
+api_clear_all_handler()
 }
 \value{
-A list containing \code{status} and \code{message}.
+A list with elements \code{status} and \code{message}, suitable for
+JSON serialization.
 }
 \description{
-Removes all collections and stored embeddings from the vector store.
-The vector-store path must be supplied explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-api_clear_all_handler(
-  vectorstore_path = path
-)
-
+This handler wipes the R-native vector store by calling
+\code{\link[=vectorstore_clear_all]{vectorstore_clear_all()}}, removing all collections and stored embeddings.
 }

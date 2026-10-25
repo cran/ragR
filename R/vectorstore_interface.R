@@ -11,40 +11,24 @@
 # - embedding  : list-column of numeric vectors
 # - metadata   : list-column (e.g., list(path=..., chunk_index=..., ...))
 
+# Internal helper: path to the RDS "database"
+vectorstore_path <- function() {
+  file.path("db", "vectorstore.rds")
+}
 
 #' Load the R-native vector store
 #'
-#' Loads the current contents of an R-native vector store from an RDS file.
-#' If the file does not exist, the function returns an empty tibble with the
-#' expected columns: `collection`, `id`, `text`, `embedding`, and `metadata`.
+#' This function loads the current contents of the R-native vector store
+#' from `db/vectorstore.rds`. If the file does not exist yet, it returns
+#' an empty tibble with the expected columns:
+#' `collection`, `id`, `text`, `embedding`, and `metadata`.
 #'
-#' The vector-store path must be supplied explicitly.
-#'
-#' @param path Character scalar; path to the vector-store RDS file.
-#'
-#' @return A tibble with one row per stored chunk, or zero rows if the store
-#'   does not yet exist.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' vectorstore_load(path)
-#'
+#' @return A tibble with one row per stored chunk, or zero rows if the store is empty.
 #' @export
-vectorstore_load <- function(path) {
-  if (
-    missing(path) ||
-      !is.character(path) ||
-      length(path) != 1L ||
-      !nzchar(path)
-  ) {
-    stop(
-      "path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
+vectorstore_load <- function() {
+  p <- vectorstore_path()
 
-  if (!file.exists(path)) {
+  if (!file.exists(p)) {
     return(
       tibble::tibble(
         collection = character(),
@@ -56,23 +40,13 @@ vectorstore_load <- function(path) {
     )
   }
 
-  store <- readRDS(path)
+  store <- readRDS(p)
 
   if (!is.data.frame(store)) {
-    stop(
-      "Vector store file is not a data frame or tibble.",
-      call. = FALSE
-    )
+    stop("Vector store file is not a data frame/tibble.", call. = FALSE)
   }
 
-  required_cols <- c(
-    "collection",
-    "id",
-    "text",
-    "embedding",
-    "metadata"
-  )
-
+  required_cols <- c("collection", "id", "text", "embedding", "metadata")
   missing_cols <- setdiff(required_cols, names(store))
 
   if (length(missing_cols) > 0L) {
@@ -86,115 +60,43 @@ vectorstore_load <- function(path) {
   tibble::as_tibble(store)
 }
 
-
-# Internal helper: save the vector store
-vectorstore_save <- function(store, path) {
-  if (
-    missing(path) ||
-      !is.character(path) ||
-      length(path) != 1L ||
-      !nzchar(path)
-  ) {
-    stop(
-      "path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
-  dir_path <- dirname(path)
-
-  if (!dir.exists(dir_path)) {
-    dir.create(
-      dir_path,
-      recursive = TRUE,
-      showWarnings = FALSE
-    )
-  }
-
-  saveRDS(store, file = path)
-
-  invisible(path)
+# Internal helper: save the store
+vectorstore_save <- function(store) {
+  dir.create("db", showWarnings = FALSE, recursive = TRUE)
+  saveRDS(store, vectorstore_path())
 }
-
 
 #' Upsert embeddings into the R-native vector store
 #'
-#' Adds new records to a vector store or replaces existing records having the
-#' same collection and identifier. The vector-store path must be supplied
-#' explicitly.
+#' @param collection Character; name of the collection.
+#' @param ids Character vector of IDs, one for each embedding.
+#' @param embeddings Numeric matrix or data frame; one row per id.
+#' @param documents Character vector of raw text for each embedding.
+#' @param metadatas Optional list or data frame of metadata per row.
 #'
-#' @param collection Character scalar; name of the collection.
-#' @param ids Character vector of identifiers, one for each embedding.
-#' @param embeddings Numeric matrix or data frame; one row per identifier.
-#' @param documents Character vector of document text, one element per
-#'   embedding.
-#' @param metadatas Optional list or data frame containing metadata for each
-#'   row.
-#' @param path Character scalar; path to the vector-store RDS file.
-#'
-#' @return Invisibly, `TRUE` on success.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' embeddings <- matrix(
-#'   c(
-#'     1, 0,
-#'     0, 1
-#'   ),
-#'   nrow = 2,
-#'   byrow = TRUE
-#' )
-#'
-#' vectorstore_upsert(
-#'   collection = "example",
-#'   ids = c("doc_1", "doc_2"),
-#'   embeddings = embeddings,
-#'   documents = c("First document", "Second document"),
-#'   path = path
-#' )
-#'
-#' vectorstore_load(path)
-#'
+#' @return Invisibly, TRUE on success.
 #' @export
 vectorstore_upsert <- function(
   collection,
   ids,
   embeddings,
   documents,
-  metadatas = NULL,
-  path
+  metadatas = NULL
 ) {
   if (!is.character(collection) || length(collection) != 1L || !nzchar(collection)) {
     stop("collection must be a single non-empty character string.", call. = FALSE)
   }
-
   if (!is.character(ids) || length(ids) == 0L) {
     stop("ids must be a non-empty character vector.", call. = FALSE)
   }
-
   if (any(is.na(ids)) || any(!nzchar(ids))) {
     stop("ids must not contain NA or empty strings.", call. = FALSE)
   }
-
   if (!is.matrix(embeddings) && !is.data.frame(embeddings)) {
     stop("embeddings must be a numeric matrix or data frame.", call. = FALSE)
   }
-
   if (!is.character(documents)) {
     stop("documents must be a character vector.", call. = FALSE)
-  }
-
-  if (
-    missing(path) ||
-      !is.character(path) ||
-      length(path) != 1L ||
-      !nzchar(path)
-  ) {
-    stop(
-      "path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
   }
 
   n <- length(ids)
@@ -202,15 +104,12 @@ vectorstore_upsert <- function(
   if (nrow(embeddings) != n) {
     stop("embeddings must have one row per id.", call. = FALSE)
   }
-
   if (length(documents) != n) {
     stop("documents must have length equal to length(ids).", call. = FALSE)
   }
-
   if (any(is.na(documents))) {
     stop("documents must not contain NA values.", call. = FALSE)
   }
-
   if (!is.null(metadatas) && length(metadatas) != n) {
     stop("metadatas must have length equal to length(ids).", call. = FALSE)
   }
@@ -242,7 +141,7 @@ vectorstore_upsert <- function(
     metadata   = metadatas
   )
 
-  store <- vectorstore_load(path)
+  store <- vectorstore_load()
 
   if (nrow(store) > 0L) {
     store <- store[
@@ -254,11 +153,10 @@ vectorstore_upsert <- function(
 
   store <- dplyr::bind_rows(store, new_rows)
 
-  vectorstore_save(store, path)
+  vectorstore_save(store)
 
   invisible(TRUE)
 }
-
 
 # Internal: cosine similarity between a matrix of embeddings and a single vector.
 cosine_similarity <- function(emb_mat, q) {
@@ -283,285 +181,107 @@ cosine_similarity <- function(emb_mat, q) {
 
 #' Query the R-native vector store for nearest neighbors
 #'
-#' Retrieves the stored chunks whose embeddings have the highest cosine
-#' similarity to a supplied query embedding. The vector-store path must be
-#' supplied explicitly.
-#'
-#' @param collection Character scalar; name of the collection.
+#' @param collection Character; name of the collection.
 #' @param query_embedding Numeric vector representing the query.
-#' @param path Character scalar; path to the vector-store RDS file.
-#' @param top_k Integer; maximum number of neighbors to retrieve.
+#' @param top_k Integer; number of neighbors to retrieve.
 #'
-#' @return A tibble with columns `collection`, `id`, `text`, `score`, and
-#'   `metadata`.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' embeddings <- matrix(
-#'   c(
-#'     1, 0,
-#'     0, 1
-#'   ),
-#'   nrow = 2,
-#'   byrow = TRUE
-#' )
-#'
-#' vectorstore_upsert(
-#'   collection = "example",
-#'   ids = c("doc_1", "doc_2"),
-#'   embeddings = embeddings,
-#'   documents = c("First document", "Second document"),
-#'   path = path
-#' )
-#'
-#' vectorstore_query(
-#'   collection = "example",
-#'   query_embedding = c(1, 0),
-#'   path = path,
-#'   top_k = 1L
-#' )
-#'
+#' @return A tibble with columns `collection`, `id`, `text`, `score`, and `metadata`.
 #' @export
 vectorstore_query <- function(
   collection,
   query_embedding,
-  path,
   top_k = 4L
 ) {
-  if (
-    !is.character(collection) ||
-      length(collection) != 1L ||
-      is.na(collection) ||
-      !nzchar(collection)
-  ) {
-    stop(
-      "collection must be a single non-empty character string.",
-      call. = FALSE
-    )
+  if (!is.character(collection) || length(collection) != 1L || !nzchar(collection)) {
+    stop("collection must be a single non-empty character string.", call. = FALSE)
   }
-
-  if (
-    !is.numeric(query_embedding) ||
-      length(query_embedding) == 0L
-  ) {
-    stop(
-      "query_embedding must be a non-empty numeric vector.",
-      call. = FALSE
-    )
+  if (!is.numeric(query_embedding) || length(query_embedding) == 0L) {
+    stop("query_embedding must be a non-empty numeric vector.", call. = FALSE)
   }
-
   if (anyNA(query_embedding)) {
-    stop(
-      "query_embedding must not contain NA values.",
-      call. = FALSE
-    )
+    stop("query_embedding must not contain NA values.", call. = FALSE)
   }
-
-  if (
-    missing(path) ||
-      !is.character(path) ||
-      length(path) != 1L ||
-      is.na(path) ||
-      !nzchar(path)
-  ) {
-    stop(
-      "path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
-  if (
-    !is.numeric(top_k) ||
-      length(top_k) != 1L ||
-      is.na(top_k) ||
-      top_k <= 0
-  ) {
-    stop(
-      "top_k must be a positive integer.",
-      call. = FALSE
-    )
+  if (!is.numeric(top_k) || length(top_k) != 1L || is.na(top_k) || top_k <= 0) {
+    stop("top_k must be a positive integer.", call. = FALSE)
   }
 
   top_k <- as.integer(top_k)
 
-  store <- vectorstore_load(path)
+  store <- vectorstore_load()
   subset <- store[store$collection == collection, , drop = FALSE]
 
   if (nrow(subset) == 0L) {
     return(
       tibble::tibble(
         collection = character(),
-        id = character(),
-        text = character(),
-        score = numeric(),
-        metadata = list()
+        id         = character(),
+        text       = character(),
+        score      = numeric(),
+        metadata   = list()
       )
     )
   }
 
-  emb_mat <- do.call(
-    rbind,
-    lapply(subset$embedding, as.numeric)
-  )
+  emb_mat <- do.call(rbind, lapply(subset$embedding, as.numeric))
 
-  sims <- cosine_similarity(
-    emb_mat,
-    query_embedding
-  )
+  sims <- cosine_similarity(emb_mat, query_embedding)
 
   subset$score <- sims
-
-  subset <- subset[
-    order(subset$score, decreasing = TRUE),
-    ,
-    drop = FALSE
-  ]
+  subset <- subset[order(subset$score, decreasing = TRUE), , drop = FALSE]
 
   if (nrow(subset) > top_k) {
-    subset <- subset[
-      seq_len(top_k),
-      ,
-      drop = FALSE
-    ]
+    subset <- subset[seq_len(top_k), , drop = FALSE]
   }
 
   tibble::tibble(
     collection = subset$collection,
-    id = subset$id,
-    text = subset$text,
-    score = subset$score,
-    metadata = subset$metadata
+    id         = subset$id,
+    text       = subset$text,
+    score      = subset$score,
+    metadata   = subset$metadata
   )
 }
 
-
 #' Delete a collection from the R-native vector store
 #'
-#' Removes all stored records belonging to a specified collection. The
-#' vector-store path must be supplied explicitly.
+#' @param collection Character; collection name to delete.
 #'
-#' @param collection Character scalar; name of the collection to delete.
-#' @param path Character scalar; path to the vector-store RDS file.
-#'
-#' @return Invisibly, `TRUE` on success.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' embeddings <- matrix(c(1, 0), nrow = 1)
-#'
-#' vectorstore_upsert(
-#'   collection = "example",
-#'   ids = "doc_1",
-#'   embeddings = embeddings,
-#'   documents = "Example document",
-#'   path = path
-#' )
-#'
-#' vectorstore_delete_collection(
-#'   collection = "example",
-#'   path = path
-#' )
-#'
-#' vectorstore_load(path)
-#'
+#' @return Invisibly, TRUE on success.
 #' @export
-vectorstore_delete_collection <- function(
-  collection,
-  path
-) {
-  if (
-    !is.character(collection) ||
-      length(collection) != 1L ||
-      is.na(collection) ||
-      !nzchar(collection)
-  ) {
-    stop(
-      "collection must be a single non-empty character string.",
-      call. = FALSE
-    )
+vectorstore_delete_collection <- function(collection) {
+  if (!is.character(collection) || length(collection) != 1L || !nzchar(collection)) {
+    stop("collection must be a single non-empty character string.", call. = FALSE)
   }
 
-  if (
-    missing(path) ||
-      !is.character(path) ||
-      length(path) != 1L ||
-      is.na(path) ||
-      !nzchar(path)
-  ) {
-    stop(
-      "path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
-  store <- vectorstore_load(path)
+  store <- vectorstore_load()
 
   if (nrow(store) == 0L) {
     return(invisible(TRUE))
   }
 
-  store <- store[
-    store$collection != collection,
-    ,
-    drop = FALSE
-  ]
+  store <- store[store$collection != collection, , drop = FALSE]
 
-  vectorstore_save(store, path)
+  vectorstore_save(store)
 
   invisible(TRUE)
 }
 
-#' Delete all collections from the R-native vector store
+#' Delete ALL collections from the vector store
 #'
-#' Replaces the vector store with an empty tibble. The vector-store path must
-#' be supplied explicitly.
+#' Completely wipes the vector store by replacing it with an empty tibble.
 #'
-#' @param path Character scalar; path to the vector-store RDS file.
-#'
-#' @return Invisibly, `TRUE`.
-#'
-#' @examples
-#' path <- tempfile(fileext = ".rds")
-#'
-#' embeddings <- matrix(c(1, 0), nrow = 1)
-#'
-#' vectorstore_upsert(
-#'   collection = "example",
-#'   ids = "doc_1",
-#'   embeddings = embeddings,
-#'   documents = "Example document",
-#'   path = path
-#' )
-#'
-#' vectorstore_clear_all(path)
-#' vectorstore_load(path)
-#'
+#' @return Invisibly, TRUE.
 #' @export
-vectorstore_clear_all <- function(path) {
-  if (
-    missing(path) ||
-      !is.character(path) ||
-      length(path) != 1L ||
-      is.na(path) ||
-      !nzchar(path)
-  ) {
-    stop(
-      "path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
+vectorstore_clear_all <- function() {
   empty <- tibble::tibble(
     collection = character(),
-    id = character(),
-    text = character(),
-    embedding = list(),
-    metadata = list()
+    id         = character(),
+    text       = character(),
+    embedding  = list(),
+    metadata   = list()
   )
 
-  vectorstore_save(empty, path)
+  vectorstore_save(empty)
 
   invisible(TRUE)
 }

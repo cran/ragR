@@ -4,26 +4,20 @@
 \alias{save_qa_log}
 \title{Save a QA log to disk}
 \usage{
-save_qa_log(qa_log, path)
+save_qa_log(qa_log, path = "db/qa_log.rds")
 }
 \arguments{
 \item{qa_log}{A tibble created by \code{\link[=qa_log_empty]{qa_log_empty()}} and populated by
 \code{\link[=log_rag_interaction]{log_rag_interaction()}}.}
 
-\item{path}{Character scalar; path to the RDS file.}
+\item{path}{Character scalar; path to the RDS file. Defaults to
+\code{"db/qa_log.rds"}.}
 }
 \value{
 Invisibly, the path to the saved file.
 }
 \description{
 This helper saves a QA log tibble, as produced by \code{\link[=log_rag_interaction]{log_rag_interaction()}},
-to an RDS file. The output path must be supplied explicitly.
-}
-\examples{
-qa_log <- qa_log_empty()
-path <- tempfile(fileext = ".rds")
-
-save_qa_log(qa_log, path)
-file.exists(path)
-
+to an RDS file. By default, it writes to \code{db/qa_log.rds} inside the
+project directory.
 }

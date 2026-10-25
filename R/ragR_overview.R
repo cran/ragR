@@ -1,120 +1,93 @@
 # R/ragR_overview.R
 
-#' ragR: Retrieval-Augmented Generation and Evaluation Tools
+#' ragR: Retrieval-Augmented Generation + RAGAS Evaluation in R
 #'
 #' @description
-#' The **ragR** package provides tools for building and evaluating
-#' retrieval-augmented generation systems in R. It includes:
+#' The **ragR** package provides a Retrieval-Augmented Generation (RAG)
+#' system implemented in R. It includes:
 #'
-#' - A data-ingestion pipeline for PDF, text, and Word documents
-#' - An R-native vector store for document chunks and embeddings
-#' - A configurable retrieval-augmented generation pipeline
-#' - Persistent question-answer logging for reproducible evaluation
-#' - Large-language-model-scored evaluation metrics, including context
-#'   precision, context recall, answer relevance, and faithfulness
+#' - A data ingestion pipeline for PDF, text, and Word documents
+#' - An R-native vector store for chunk embeddings
+#' - A configurable RAG pipeline that uses OpenAI embeddings and chat models
+#' - Persistent QA logging for reproducible evaluation
+#' - LLM-scored RAGAS-style metrics, including context precision, context
+#'   recall, answer relevance, and faithfulness
 #' - A Plumber-based HTTP API suitable for chatbot and evaluation frontends
 #'
 #' @section Architecture:
 #'
 #' The package is organized into several modules:
 #'
-#' - **Ingestion (`ingestion_files.R`)**
+#' - **Ingestion (`ingestion_files.R`)**  
+#'   Extracts text from PDF/TXT/DOCX files, chunks it, and prepares data
+#'   for embedding and storage. Ingestion is handled through package functions
+#'   and development scripts, not through the minimal HTTP API.
 #'
-#'   Extracts text from PDF, TXT, and DOCX files, divides the text into chunks,
-#'   and prepares those chunks for embedding and storage. The vector-store path
-#'   must be supplied explicitly by the caller.
+#' - **Embeddings & Chat (`embeddings_openai.R`)**  
+#'   Wraps the OpenAI REST API for embeddings, such as
+#'   `"text-embedding-3-small"`, and chat models, such as
+#'   `"gpt-4o-mini"`. Reads the API key from `OPENAI_API_KEY`.
 #'
-#' - **Embeddings and chat (`embeddings_openai.R`)**
+#' - **Vector Store (`vectorstore_interface.R`)**  
+#'   Implements an R-native vector store using tibbles and numeric matrices,
+#'   with functions to add, query, and clear stored embeddings.
+#'   Also includes `vectorstore_clear_all()` for wiping the entire vector store
+#'   in one operation.
 #'
-#'   Wraps the OpenAI REST API for embedding models, such as
-#'   `"text-embedding-3-small"`, and chat models, such as `"gpt-4o-mini"`.
-#'   The API key is read from the `OPENAI_API_KEY` environment variable.
-#'
-#' - **Vector store (`vectorstore_interface.R`)**
-#'
-#'   Implements an R-native vector store using tibbles and numeric matrices.
-#'   Functions are provided to load the store, add or update records, retrieve
-#'   similar chunks, delete collections, and clear the complete store.
-#'
-#'   All vector-store functions require an explicit storage path.
-#'
-#' - **Retrieval-augmented generation pipeline (`rag_pipeline.R`)**
-#'
+#' - **RAG Pipeline (`rag_pipeline.R`)**  
 #'   Given a user question, the pipeline:
+#'   1. Computes an embedding for the question  
+#'   2. Retrieves top-k similar chunks from the vector store  
+#'   3. Builds a grounded context-aware prompt  
+#'   4. Calls the OpenAI chat model to generate an answer
 #'
-#'   1. Computes an embedding for the question
-#'   2. Retrieves similar chunks from the selected vector-store collection
-#'   3. Builds a grounded, context-aware prompt
-#'   4. Calls a chat model to generate an answer
+#' - **QA Logging & Persistence (`qa_logging.R`, `qa_persistence.R`)**  
+#'   Stores each interaction in `db/qa_log.rds`, including the question, model
+#'   answer, retrieved chunks, final grounded prompt, model names, and
+#'   timestamps. Provides helpers to load, save, and clear logs.
 #'
-#' - **Question-answer logging and persistence
-#'   (`qa_logging.R`, `qa_persistence.R`)**
+#' - **RAGAS Metrics & Summary (`ragas_metrics.R`, `ragas_summary.R`)**  
+#'   Computes LLM-scored RAGAS-style metrics, including context precision,
+#'   context recall, answer relevance, faithfulness, and an overall score.
+#'   Provides summary helpers for aggregating metric results across QA pairs.
 #'
-#'   Stores interactions including the question, model answer, retrieved
-#'   chunks, final grounded prompt, model names, collection name, and
-#'   timestamp. Helpers are provided to load, save, and clear logs.
+#' - **Reports (`ragas_report.R`)**  
+#'   Generates a performance report by:
+#'   - Computing LLM-scored metrics from the QA log  
+#'   - Saving `db/qa_metrics.rds`  
+#'   - Writing `reports/ragas/ragas_summary.csv`  
+#'   - Writing a bar chart of mean metrics to
+#'     `reports/ragas/ragas_means.png`
 #'
-#'   Log locations must be supplied explicitly.
-#'
-#' - **Evaluation metrics and summaries
-#'   (`ragas_metrics.R`, `ragas_summary.R`)**
-#'
-#'   Computes large-language-model-scored evaluation metrics, including
-#'   context precision, context recall, answer relevance, faithfulness, and an
-#'   overall score. Summary helpers aggregate metric results across
-#'   question-answer pairs.
-#'
-#' - **Reports (`ragas_report.R`)**
-#'
-#'   Generates an evaluation report by:
-#'
-#'   - Computing metrics from a saved question-answer log
-#'   - Saving the resulting metrics to an explicitly supplied RDS path
-#'   - Writing a summary CSV to an explicitly supplied output directory
-#'   - Writing a bar chart of mean metric values to that output directory
-#'
-#' - **API handlers (`api_handlers.R`)**
-#'
-#'   Connect the core package functions to HTTP endpoints. Storage paths are
-#'   supplied by the server configuration rather than by client request bodies
-#'   or hidden package defaults.
+#' - **API Handlers (`api_handlers.R`)**  
+#'   Functions that connect the core logic to HTTP endpoints. These are
+#'   called by the Plumber router defined in `inst/api/`.
 #'
 #' @section HTTP API:
 #'
-#' The development server in `scripts/dev/run_api.R` exposes:
+#' When `scripts/dev/run_api.R` is executed, a Plumber server exposes:
 #'
-#' - `POST /chat`
+#' - `POST /chat`  
+#'   Runs the RAG pipeline for a user question and logs the result into
+#'   `db/qa_log.rds`.
 #'
-#'   Runs the retrieval-augmented generation pipeline for a user question and
-#'   appends the interaction to the configured question-answer log.
+#' - `GET /ragas`  
+#'   Computes and returns LLM-scored RAGAS-style metrics and a summary for
+#'   the logged QA pairs.
 #'
-#' - `GET /ragas`
+#' - `POST /ragas/report`  
+#'   Computes LLM-scored metrics from the QA log, saves the metrics and report
+#'   artifacts to disk, and returns a small summary object.
 #'
-#'   Computes and returns evaluation metrics and a summary for the logged
-#'   question-answer interactions.
+#' - `POST /ragas/clear`  
+#'   Clears the QA log, QA metrics, and report files.
 #'
-#' - `POST /ragas/report`
+#' - `POST /clear`  
+#'   Clears one vector-store collection.
 #'
-#'   Computes metrics from the configured question-answer log and writes the
-#'   metrics, summary CSV, and plot to server-configured locations.
-#'
-#' - `POST /ragas/clear`
-#'
-#'   Clears the configured question-answer log, metrics file, and report
-#'   directory.
-#'
-#' - `POST /clear`
-#'
-#'   Clears one collection from the configured vector store.
-#'
-#' - `POST /clear_all`
-#'
-#'   Clears all collections from the configured vector store using
-#'   [api_clear_all_handler()] and [vectorstore_clear_all()].
-#'
-#' The development server uses a temporary storage directory unless a
-#' persistent location is supplied through the `RAGR_API_DATA_DIR`
-#' environment variable.
+#' - `POST /clear_all`  
+#'   Clears the entire vector store across all collections. Uses
+#'   [api_clear_all_handler()], which calls [vectorstore_clear_all()].
 #'
 #' @section Usage:
 #'
@@ -123,30 +96,26 @@
 #' ```r
 #' library(ragR)
 #'
-#' vectorstore_path <- tempfile(fileext = ".rds")
-#'
-#' # Documents must first be ingested into this vector store.
+#' # Run a RAG query
 #' res <- query_rag(
-#'   question = "What is this document about?",
-#'   collection = "default",
-#'   vectorstore_path = vectorstore_path,
-#'   top_k = 5L,
+#'   question        = "What is this document about?",
+#'   collection      = "default",
+#'   top_k           = 5,
 #'   embedding_model = "text-embedding-3-small",
-#'   chat_model = "gpt-4o-mini",
-#'   system_prompt = "You are a helpful assistant."
+#'   chat_model      = "gpt-4o-mini",
+#'   system_prompt   = "You are a helpful assistant."
 #' )
 #'
 #' cat(res$answer)
 #' ```
 #'
-#' To run the development HTTP server from the project root:
+#' As a backend service:
 #'
 #' ```r
+#' # From the project root
 #' source("scripts/dev/run_api.R")
+#' # Visit http://127.0.0.1:8000/__docs__/ for interactive docs
 #' ```
-#'
-#' Interactive API documentation is then available at
-#' `http://127.0.0.1:8000/__docs__/`.
 #'
 #' @keywords RAG NLP OpenAI RAGAS chatbot embeddings
 #'

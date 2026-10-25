@@ -1,21 +1,20 @@
-# ragR: Retrieval-Augmented Generation and Evaluation Tools in R
+# ragR: Retrieval-Augmented Generation and RAGAS Evaluation in R
 
 `ragR` is an R package for building, running, logging, and evaluating
-retrieval-augmented generation workflows.
+Retrieval-Augmented Generation (RAG) workflows in R.
 
 It provides:
 
-- document-ingestion and chunking utilities;
-- OpenAI-based embeddings and chat generation;
-- an R-native vector store backed by local RDS files;
-- a configurable retrieval-augmented generation pipeline;
-- persistent question-answer logging;
-- large-language-model-scored evaluation metrics inspired by Retrieval
-  Augmented Generation Assessment (RAGAS); and
-- Plumber handlers for chatbot and evaluation backends.
+- document ingestion and chunking utilities,
+- OpenAI-based embeddings and chat generation,
+- an R-native vector store backed by local RDS files,
+- a configurable RAG pipeline,
+- persistent question-answer logging,
+- LLM-scored RAGAS-style evaluation metrics, and
+- a minimal Plumber API backend for chatbot and evaluation frontends.
 
 The package is designed for research, coursework, experimentation, and
-reproducible retrieval-augmented generation evaluation workflows.
+reproducible RAG evaluation workflows.
 
 ---
 
@@ -23,80 +22,76 @@ reproducible retrieval-augmented generation evaluation workflows.
 
 ### Document ingestion
 
-`ragR` can ingest documents, divide text into chunks, generate embeddings, and
-store the chunks and embeddings in a local R-native vector store.
+`ragR` can ingest documents, split text into chunks, generate embeddings, and
+store chunks and embeddings in a local R-native vector store.
 
 Supported file types depend on the available R and system dependencies. Plain
-text ingestion is the simplest option. PDF ingestion may require the
-`pdftools` R package and the Poppler system library.
+text ingestion is the simplest path. PDF ingestion may require the `pdftools` R
+package and the Poppler system library.
 
-The vector-store location must be supplied explicitly by the caller. For
-example, a user may choose a persistent project location such as:
+Runtime vector-store files are created locally by the user, commonly at paths
+such as:
 
 ```text
 db/vectorstore.rds
 ```
 
-or a temporary location created with `tempfile()`.
+These files are not part of the installed package.
 
-Runtime vector-store files are not part of the installed package.
+### Retrieval-Augmented Generation
 
-### Retrieval-augmented generation
+For a user question, the RAG pipeline:
 
-For a user question, the retrieval-augmented generation pipeline:
-
-1. embeds the question using an embedding model;
-2. retrieves similar chunks from the selected vector-store collection;
-3. builds a grounded prompt using the retrieved context;
-4. sends the grounded prompt to a chat model; and
+1. embeds the question using an OpenAI embedding model,
+2. retrieves the most similar chunks from the local vector store,
+3. builds a grounded RAG prompt using the retrieved context,
+4. sends the grounded prompt to an OpenAI chat model, and
 5. returns the answer, retrieved chunks, and final prompt.
 
-The primary user-facing function is:
+The primary user-facing RAG function is:
 
 ```r
 query_rag()
 ```
 
-The vector-store path must be supplied explicitly.
-
 The API-level `system_prompt` is passed as a system message to the chat model.
-It is not inserted into the constructed retrieval-augmented generation prompt.
+It is not inserted into the constructed RAG prompt.
 
-### Persistent question-answer logging
+### Persistent Q/A logging
 
-`ragR` can log interactions to a user-selected RDS file.
+`ragR` can log RAG interactions into a local RDS file, commonly:
+
+```text
+db/qa_log.rds
+```
 
 Each logged row includes:
 
-- `qa_id`;
-- `question`;
-- `prompt_final`;
-- `answer_model`;
-- `answer_reference`;
-- `collection`;
-- `retrieved_ids`;
-- `retrieved_texts`;
-- `chat_model`;
-- `embedding_model`; and
-- `timestamp`.
+- `qa_id`
+- `question`
+- `prompt_final`
+- `answer_model`
+- `answer_reference`
+- `collection`
+- `retrieved_ids`
+- `retrieved_texts`
+- `chat_model`
+- `embedding_model`
+- `timestamp`
 
-The `answer_reference` column is optional. It can be completed later for
-controlled evaluation experiments. When it is absent or empty, some evaluation
-functions may use `answer_model` where needed.
+The `answer_reference` column is optional. It can be filled later for controlled
+evaluation experiments. If it is absent or empty, the RAGAS metric functions can
+fall back to `answer_model` where needed.
 
-The package does not select a default question-answer log location. Paths must
-be supplied explicitly to the persistence functions.
+### LLM-scored RAGAS-style metrics
 
-### Large-language-model-scored evaluation metrics
+`ragR` computes LLM-scored RAGAS-style metrics:
 
-`ragR` computes evaluation metrics inspired by Retrieval Augmented Generation
-Assessment, including:
-
-- context precision;
-- context recall;
-- answer relevance;
-- faithfulness; and
-- an overall score.
+- Context Precision
+- Context Recall
+- Answer Relevance
+- Faithfulness
+- RAGAS Overall
 
 The main metric functions are:
 
@@ -105,36 +100,41 @@ compute_ragas_metrics()
 compute_ragas_metrics_llm()
 ```
 
-In the current package version, these metrics are scored using large language
-models. Deterministic approximation metrics are not included.
+In the current package version, RAGAS evaluation is LLM-scored. Deterministic
+approximation metrics are not included.
 
-Metric values may be `NA` when a score cannot be computed, required inputs are
-unavailable, or external model scoring fails.
+Metric values may be `NA` when a score is not computable, when required inputs
+are unavailable, or when external LLM/API scoring fails.
 
-Metrics and reports are written only to locations explicitly supplied by the
-caller.
+Metrics can be saved locally, commonly to:
 
-### Plumber API backend
+```text
+db/qa_metrics.rds
+```
 
-The source repository includes a development Plumber server for chatbot and
-evaluation frontends.
+Reports can be written to a user-created directory, commonly:
 
-Current routes are:
+```text
+reports/ragas/
+```
+
+### Minimal Plumber API backend
+
+The package includes a minimal Plumber API for chatbot and evaluation
+frontends.
+
+Current API exposure:
 
 | Endpoint | Method | Purpose |
 |---|---:|---|
-| `/chat` | POST | Ask a retrieval-augmented generation question and log the interaction |
-| `/ragas` | GET | Compute and return evaluation metrics and a summary |
+| `/chat` | POST | Ask a RAG question and log the interaction |
+| `/ragas` | GET | Compute and return RAGAS metrics and summary |
 | `/ragas/report` | POST | Compute metrics and save report artifacts |
-| `/ragas/clear` | POST | Clear the question-answer log, metrics, and report files |
+| `/ragas/clear` | POST | Clear QA log, metrics, and report files |
 | `/clear` | POST | Clear one vector-store collection |
 | `/clear_all` | POST | Clear the entire vector store |
 
-There is no ingestion endpoint in the current minimal API. Document ingestion
-is performed through package functions or development scripts.
-
-The API server configures storage paths on the server side. File paths are not
-accepted from client JSON request bodies.
+There is no ingestion endpoint in the current minimal API.
 
 ---
 
@@ -159,24 +159,24 @@ cd ragR
 Install development tools if needed:
 
 ```r
-install.packages(c("pkgload", "testthat", "roxygen2"))
+install.packages("devtools")
 ```
 
 Load the package during development:
 
 ```r
-pkgload::load_all()
+devtools::load_all()
 ```
 
 Or install it locally:
 
 ```r
-install.packages(".", repos = NULL, type = "source")
+devtools::install()
 ```
 
 ### Optional: restore the development environment
 
-The GitHub repository may include development-environment files. When using
+The GitHub repository may include development environment files. If using
 `renv`, restore the environment with:
 
 ```r
@@ -184,33 +184,33 @@ install.packages("renv")
 renv::restore()
 ```
 
-Depending on the operating system, some dependencies may require additional
-system libraries. PDF ingestion through `pdftools`, for example, may require
+Depending on your operating system, some dependencies may require additional
+system libraries. In particular, PDF ingestion through `pdftools` may require
 Poppler.
 
 ---
 
 ## OpenAI API key
 
-`ragR` reads the OpenAI API key from:
+`ragR` reads the OpenAI API key from the environment variable:
 
 ```text
 OPENAI_API_KEY
 ```
 
-The key can be added to a user-level `.Renviron` file:
+You can add it to your user-level `.Renviron` file:
 
 ```r
 usethis::edit_r_environ("user")
 ```
 
-Add a line such as:
+Add:
 
 ```text
 OPENAI_API_KEY=your_key_here
 ```
 
-Restart R after editing the file.
+Then restart R.
 
 Most package tests use synthetic data and do not require an OpenAI API key.
 Functions that call OpenAI models require a valid API key and internet access.
@@ -219,77 +219,36 @@ Functions that call OpenAI models require a valid API key and internet access.
 
 ## Usage from R
 
-### Choose runtime paths
-
-All runtime paths are selected explicitly.
-
-The following example uses a temporary directory:
-
-```r
-library(ragR)
-
-runtime_dir <- file.path(
-  tempdir(),
-  "ragR-example"
-)
-
-dir.create(
-  runtime_dir,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-vectorstore_path <- file.path(
-  runtime_dir,
-  "vectorstore.rds"
-)
-
-qa_log_path <- file.path(
-  runtime_dir,
-  "qa_log.rds"
-)
-
-qa_metrics_path <- file.path(
-  runtime_dir,
-  "qa_metrics.rds"
-)
-
-report_dir <- file.path(
-  runtime_dir,
-  "reports"
-)
-```
-
-For persistent work, replace `runtime_dir` with a directory chosen by the user.
-
 ### Ingest documents
 
 ```r
 library(ragR)
 
-input_paths <- c(
-  "data-raw/my_document.txt"
-)
+input_paths <- c("data-raw/my_document.txt")
 
 ingest_documents(
   paths = input_paths,
-  vectorstore_path = vectorstore_path,
   collection = "default",
+  vectorstore_path = "db/vectorstore.rds",
   embedding_model = "text-embedding-3-small"
 )
+```
+
+This creates or updates a local vector store, commonly:
+
+```text
+db/vectorstore.rds
 ```
 
 For PDF ingestion, use a PDF path such as:
 
 ```r
-input_paths <- c(
-  "data-raw/my_document.pdf"
-)
+input_paths <- c("data-raw/my_document.pdf")
 ```
 
 PDF ingestion may require `pdftools` and Poppler.
 
-### Ask retrieval-augmented generation questions
+### Ask RAG questions
 
 ```r
 library(ragR)
@@ -297,7 +256,6 @@ library(ragR)
 res <- query_rag(
   question = "What is this document about?",
   collection = "default",
-  vectorstore_path = vectorstore_path,
   top_k = 5L,
   embedding_model = "text-embedding-3-small",
   chat_model = "gpt-4o-mini",
@@ -311,18 +269,19 @@ cat(res$answer)
 
 The result includes:
 
-- `answer`;
-- `retrieved`;
-- `prompt`; and
-- model metadata.
+- `answer`
+- `retrieved`
+- `prompt`
+- model metadata
 
-### Save and load question-answer logs
+### Save and load Q/A logs
 
 ```r
 library(ragR)
 
 qa_log <- qa_log_empty()
 
+# `res` is the result returned by query_rag()
 qa_log <- log_rag_interaction(
   qa_log = qa_log,
   question = "What is this document about?",
@@ -332,24 +291,17 @@ qa_log <- log_rag_interaction(
   embedding_model = "text-embedding-3-small"
 )
 
-save_qa_log(
-  qa_log = qa_log,
-  path = qa_log_path
-)
+save_qa_log(qa_log, path = "db/qa_log.rds")
 
-qa_log <- load_qa_log(
-  path = qa_log_path
-)
+qa_log <- load_qa_log(path = "db/qa_log.rds")
 ```
 
-### Compute evaluation metrics
+### Compute RAGAS metrics
 
 ```r
 library(ragR)
 
-qa_log <- load_qa_log(
-  path = qa_log_path
-)
+qa_log <- load_qa_log("db/qa_log.rds")
 
 qa_metrics <- compute_ragas_metrics(
   qa_log,
@@ -357,112 +309,47 @@ qa_metrics <- compute_ragas_metrics(
   embedding_model = "text-embedding-3-small"
 )
 
-save_qa_metrics(
-  qa_metrics = qa_metrics,
-  path = qa_metrics_path
-)
+save_qa_metrics(qa_metrics, "db/qa_metrics.rds")
 
-summary_tbl <- summarize_ragas(
-  qa_metrics
-)
-
+summary_tbl <- summarize_ragas(qa_metrics)
 print(summary_tbl)
 ```
 
-### Generate an evaluation report
+### Generate a RAGAS report
 
 ```r
 library(ragR)
 
 generate_ragas_report(
-  qa_log_path = qa_log_path,
-  qa_metrics_path = qa_metrics_path,
-  output_dir = report_dir,
+  qa_log_path = "db/qa_log.rds",
+  qa_metrics_path = "db/qa_metrics.rds",
+  output_dir = "reports/ragas",
   judge_model = "gpt-4o-mini"
 )
 ```
 
-This writes:
+This writes local report artifacts such as:
 
 ```text
-<qa_metrics_path>
-<report_dir>/ragas_summary.csv
-<report_dir>/ragas_means.png
-```
-
-All three locations are controlled by the caller.
-
-### Clear saved state
-
-Clear a question-answer log:
-
-```r
-clear_qa_log(
-  path = qa_log_path
-)
-```
-
-Clear saved metrics:
-
-```r
-clear_qa_metrics(
-  path = qa_metrics_path
-)
-```
-
-Clear one vector-store collection:
-
-```r
-vectorstore_delete_collection(
-  collection = "default",
-  path = vectorstore_path
-)
-```
-
-Clear the entire vector store:
-
-```r
-vectorstore_clear_all(
-  path = vectorstore_path
-)
+db/qa_metrics.rds
+reports/ragas/ragas_summary.csv
+reports/ragas/ragas_means.png
 ```
 
 ---
 
-## Running the development API backend
+## Running the API backend
 
-The source repository includes:
-
-```text
-scripts/dev/run_api.R
-```
-
-Run it from the project root:
-
-```bash
-Rscript scripts/dev/run_api.R
-```
-
-By default, the server stores runtime files under a temporary directory.
-
-To use a persistent directory, set `RAGR_API_DATA_DIR` before starting the
-server.
-
-On macOS or Linux:
-
-```bash
-export RAGR_API_DATA_DIR="/path/to/ragR-api-data"
-Rscript scripts/dev/run_api.R
-```
-
-From R:
+The installed package includes Plumber API files under `inst/api/`. To run the
+API from an installed package:
 
 ```r
-Sys.setenv(
-  RAGR_API_DATA_DIR = "/path/to/ragR-api-data"
-)
+library(plumber)
 
-source("scripts/dev/run_api.R")
+api_file <- system.file("api", "plumber.R", package = "ragR")
+
+pr <- plumber::pr(api_file)
+plumber::pr_run(pr, host = "127.0.0.1", port = 8000)
 ```
 
 The local backend runs at:
@@ -477,22 +364,13 @@ Interactive Swagger documentation is available at:
 http://127.0.0.1:8000/__docs__/
 ```
 
-The development server uses the configured data directory to construct:
-
-```text
-vectorstore.rds
-qa_log.rds
-qa_metrics.rds
-ragas/
-```
-
 ---
 
 ## API examples
 
 ### POST `/chat`
 
-Ask a retrieval-augmented generation question and log the interaction.
+Ask a RAG question and log the interaction.
 
 Example request body:
 
@@ -504,89 +382,68 @@ Example request body:
 }
 ```
 
-Example R request:
+Example R call:
 
 ```r
 library(httr2)
 
-resp <- request(
-  "http://127.0.0.1:8000/chat"
-) |>
+resp <- request("http://127.0.0.1:8000/chat") |>
   req_method("POST") |>
-  req_body_json(
-    list(
-      question = "What is the document about?",
-      collection = "default",
-      top_k = 5
-    )
-  ) |>
+  req_body_json(list(
+    question = "What is the document about?",
+    collection = "default",
+    top_k = 5
+  )) |>
   req_perform()
 
-resp_body_json(
-  resp,
-  simplifyVector = TRUE
-)
+resp_body_json(resp, simplifyVector = TRUE)
 ```
 
-The interaction is appended to the question-answer log configured by the
-server.
+The interaction is appended to the configured Q/A log.
 
 ### GET `/ragas`
 
-Compute evaluation metrics from the configured question-answer log and return
-the metrics and summary.
+Compute RAGAS metrics from the saved Q/A log and return the metrics and summary.
 
 ```r
 library(httr2)
 
-resp <- request(
-  "http://127.0.0.1:8000/ragas"
-) |>
+resp <- request("http://127.0.0.1:8000/ragas") |>
   req_method("GET") |>
   req_perform()
 
-resp_body_json(
-  resp,
-  simplifyVector = TRUE
-)
+resp_body_json(resp, simplifyVector = TRUE)
 ```
+
+This endpoint can operate even when `answer_reference` is missing. In that case,
+the package falls back to `answer_model` where needed.
 
 ### POST `/ragas/report`
 
-Compute metrics and save report artifacts to server-configured locations.
+Compute RAGAS metrics and save report artifacts.
 
 ```r
 library(httr2)
 
-resp <- request(
-  "http://127.0.0.1:8000/ragas/report"
-) |>
+resp <- request("http://127.0.0.1:8000/ragas/report") |>
   req_method("POST") |>
   req_perform()
 
-resp_body_json(
-  resp,
-  simplifyVector = TRUE
-)
+resp_body_json(resp, simplifyVector = TRUE)
 ```
 
 ### POST `/ragas/clear`
 
-Clear the configured question-answer log, saved metrics, and report directory.
+Clear the Q/A log, Q/A metrics, and generated report files.
 
 ```r
 library(httr2)
 
-resp <- request(
-  "http://127.0.0.1:8000/ragas/clear"
-) |>
+resp <- request("http://127.0.0.1:8000/ragas/clear") |>
   req_method("POST") |>
   req_perform()
 
-resp_body_json(
-  resp,
-  simplifyVector = TRUE
-)
+resp_body_json(resp, simplifyVector = TRUE)
 ```
 
 ### POST `/clear`
@@ -601,61 +458,47 @@ Example request body:
 }
 ```
 
-When `collection` is omitted, `"default"` is used.
+If `collection` is omitted, the handler may fall back to the default collection
+depending on the package-side handler.
 
 ### POST `/clear_all`
 
-Clear all collections from the configured vector store.
+Clear the entire vector store across all collections.
 
 ```r
 library(httr2)
 
-resp <- request(
-  "http://127.0.0.1:8000/clear_all"
-) |>
+resp <- request("http://127.0.0.1:8000/clear_all") |>
   req_method("POST") |>
   req_perform()
 
-resp_body_json(
-  resp,
-  simplifyVector = TRUE
-)
+resp_body_json(resp, simplifyVector = TRUE)
 ```
 
 ---
 
 ## Development scripts
 
-The source repository includes development scripts under `scripts/dev/`.
-They are intended for local experimentation and reproducibility and are
-excluded from the package build.
+The GitHub repository includes development scripts under `scripts/dev/` for
+local experimentation and reproducibility. These scripts are intended for source
+repository workflows and are not part of the installed package build.
 
-### General development scripts
+Important development scripts include:
 
 ```text
-scripts/dev/demo_clear_collection.R
-scripts/dev/demo_clear_db.R
 scripts/dev/demo_ingest.R
 scripts/dev/demo_rag.R
 scripts/dev/run_api.R
-```
-
-### Question-answer and evaluation scripts
-
-```text
-scripts/dev/qa/clear_qa_state.R
 scripts/dev/qa/collect_qa.R
 scripts/dev/qa/compute_metrics.R
-scripts/dev/qa/export_for_ragas_python.R
-scripts/dev/qa/insert_gt.R
-scripts/dev/qa/run_eval_loop.R
 scripts/dev/qa/run_eval_pipeline.R
+scripts/dev/qa/run_eval_loop.R
 scripts/dev/qa/visualize_metrics.R
 ```
 
-Some evaluation scripts are intended for controlled experiments in which
-`answer_reference` has already been populated. The API workflow does not
-require `answer_reference`.
+Some Q/A scripts are intended for controlled experiments where
+`answer_reference` has already been populated. The API workflow does not require
+`answer_reference`.
 
 ---
 
@@ -677,8 +520,7 @@ ragR/
     └── dev/
 ```
 
-Runtime artifacts may be stored in any user-selected directory. Common
-development locations include:
+Local runtime artifacts are commonly stored in user-created folders such as:
 
 ```text
 db/
@@ -686,31 +528,22 @@ reports/ragas/
 data-raw/
 ```
 
-These are development or runtime folders and are not package data.
+These folders are development/runtime folders and are typically excluded from
+package builds.
 
 ---
 
 ## Testing
 
-Load the local package and run the tests:
-
-```r
-pkgload::load_all()
-testthat::test_dir("tests/testthat")
-```
-
-Run an R package check with:
-
-```r
-rcmdcheck::rcmdcheck(
-  args = "--as-cran"
-)
-```
-
-When `devtools` is available, the equivalent commands are:
+Run package tests with:
 
 ```r
 devtools::test()
+```
+
+Run package checks with:
+
+```r
 devtools::check(args = "--as-cran")
 ```
 
@@ -719,22 +552,35 @@ internet access.
 
 ---
 
-## Local and generated files
+## Notes on generated/local files
 
-Runtime files should generally not be committed unless they are intentionally
-included for reproducibility.
-
-Examples include:
+The following folders/files are local runtime artifacts and should not be
+committed unless intentionally needed for reproducibility:
 
 ```text
-vectorstore.rds
-qa_log.rds
-qa_metrics.rds
-ragas_summary.csv
-ragas_means.png
+db/
+reports/ragas/
+data-raw/
 ```
 
-The exact locations are selected by the user or server configuration.
+Typical generated files include:
+
+```text
+db/vectorstore.rds
+db/qa_log.rds
+db/qa_metrics.rds
+reports/ragas/ragas_summary.csv
+reports/ragas/ragas_means.png
+```
+
+---
+
+## Authors
+
+- Muhammad Aimal Rehman
+- Zhili Lu
+- Seoyoung Kim
+- Chi-Kuang Yeh
 
 ---
 

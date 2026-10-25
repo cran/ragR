@@ -4,10 +4,11 @@
 \alias{load_qa_log}
 \title{Load a QA log from disk}
 \usage{
-load_qa_log(path)
+load_qa_log(path = "db/qa_log.rds")
 }
 \arguments{
-\item{path}{Character scalar; path to the RDS file.}
+\item{path}{Character scalar; path to the RDS file. Defaults to
+\code{"db/qa_log.rds"}.}
 }
 \value{
 A tibble containing the QA log.
@@ -15,10 +16,4 @@ A tibble containing the QA log.
 \description{
 This helper loads a QA log tibble from an RDS file. If the file does
 not exist, it returns an empty QA log created by \code{\link[=qa_log_empty]{qa_log_empty()}}.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-load_qa_log(path)
-
 }

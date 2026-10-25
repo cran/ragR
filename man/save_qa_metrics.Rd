@@ -4,26 +4,19 @@
 \alias{save_qa_metrics}
 \title{Save QA metrics to disk}
 \usage{
-save_qa_metrics(qa_metrics, path)
+save_qa_metrics(qa_metrics, path = "db/qa_metrics.rds")
 }
 \arguments{
 \item{qa_metrics}{A tibble created by \code{\link[=compute_ragas_metrics]{compute_ragas_metrics()}}.}
 
-\item{path}{Character scalar; path to the RDS file.}
+\item{path}{Character scalar; path to the RDS file. Defaults to
+\code{"db/qa_metrics.rds"}.}
 }
 \value{
 Invisibly, the path to the saved file.
 }
 \description{
 This helper saves a QA metrics tibble, as produced by
-\code{\link[=compute_ragas_metrics]{compute_ragas_metrics()}}, to an RDS file. The output path must be
-supplied explicitly.
-}
-\examples{
-qa_metrics <- qa_metrics_empty()
-path <- tempfile(fileext = ".rds")
-
-save_qa_metrics(qa_metrics, path)
-file.exists(path)
-
+\code{\link[=compute_ragas_metrics]{compute_ragas_metrics()}}, to an RDS file. By default, it writes to
+\code{db/qa_metrics.rds} inside the project directory.
 }

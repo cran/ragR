@@ -69,33 +69,15 @@ summarize_ragas <- function(qa_metrics) {
   dplyr::bind_rows(rows)
 }
 
-#' Plot mean RAG evaluation metrics to a PNG
+#' Plot mean RAGAS metrics to a PNG
 #'
-#' Creates a bar chart of mean metric values and writes it to a PNG file.
-#' The output path must be supplied explicitly.
+#' Creates a simple bar chart of mean metric values.
 #'
 #' @param summary_df Output of [summarize_ragas()].
-#' @param output_path Character scalar; path where the PNG file is written.
-#' @param width,height Positive numeric values giving the plot dimensions in
-#'   pixels.
+#' @param output_path Where to save the PNG.
+#' @param width,height Plot size in pixels.
 #'
 #' @return Invisibly, `output_path`.
-#'
-#' @examples
-#' summary_df <- tibble::tibble(
-#'   metric = c("Context precision", "Faithfulness"),
-#'   mean = c(0.8, 0.9)
-#' )
-#'
-#' output_path <- tempfile(fileext = ".png")
-#'
-#' plot_ragas_means(
-#'   summary_df = summary_df,
-#'   output_path = output_path
-#' )
-#'
-#' file.exists(output_path)
-#'
 #' @export
 plot_ragas_means <- function(
   summary_df,
@@ -103,120 +85,42 @@ plot_ragas_means <- function(
   width = 1200,
   height = 700
 ) {
-  if (
-    is.null(summary_df) ||
-      !is.data.frame(summary_df) ||
-      nrow(summary_df) == 0L
-  ) {
-    stop(
-      "summary_df must be a non-empty data frame or tibble.",
-      call. = FALSE
-    )
+  if (is.null(summary_df) || nrow(summary_df) == 0L) {
+    stop("summary_df is empty; nothing to plot.", call. = FALSE)
   }
 
   if (!all(c("metric", "mean") %in% names(summary_df))) {
-    stop(
-      "summary_df must have columns named 'metric' and 'mean'.",
-      call. = FALSE
-    )
+    stop("summary_df must have columns: metric, mean.", call. = FALSE)
   }
 
-  if (
-    missing(output_path) ||
-      !is.character(output_path) ||
-      length(output_path) != 1L ||
-      is.na(output_path) ||
-      !nzchar(output_path)
-  ) {
-    stop(
-      "output_path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
+  means <- suppressWarnings(as.numeric(summary_df$mean))
 
-  if (
-    !is.numeric(width) ||
-      length(width) != 1L ||
-      is.na(width) ||
-      width <= 0
-  ) {
-    stop("width must be a single positive number.", call. = FALSE)
-  }
-
-  if (
-    !is.numeric(height) ||
-      length(height) != 1L ||
-      is.na(height) ||
-      height <= 0
-  ) {
-    stop("height must be a single positive number.", call. = FALSE)
-  }
-
-  means <- suppressWarnings(
-    as.numeric(summary_df$mean)
-  )
-
-  if (
-    length(means) == 0L ||
-      all(!is.finite(means))
-  ) {
-    stop(
-      "summary_df$mean contains no finite values to plot.",
-      call. = FALSE
-    )
+  if (length(means) == 0L || all(is.na(means))) {
+    stop("summary_df$mean contains no finite values to plot.", call. = FALSE)
   }
 
   names(means) <- as.character(summary_df$metric)
 
-  output_dir <- dirname(output_path)
+  dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
 
-  if (!dir.exists(output_dir)) {
-    dir.create(
-      output_dir,
-      recursive = TRUE,
-      showWarnings = FALSE
-    )
-  }
-
-  grDevices::png(
-    filename = output_path,
-    width = width,
-    height = height,
-    res = 150
-  )
+  # Base R plotting; avoids adding extra plotting dependencies.
+  grDevices::png(filename = output_path, width = width, height = height, res = 150)
   on.exit(grDevices::dev.off(), add = TRUE)
 
-  old_par <- graphics::par(no.readonly = TRUE)
-  on.exit(graphics::par(old_par), add = TRUE)
+  graphics::par(mar = c(9, 5, 3, 1) + 0.1)
 
-  graphics::par(
-    mar = c(9, 5, 3, 1) + 0.1
-  )
-
-  y_max <- max(
-    1,
-    max(means, na.rm = TRUE)
-  ) * 1.1
+  y_max <- max(1, max(means, na.rm = TRUE)) * 1.1
 
   bp <- graphics::barplot(
     height = means,
-    las = 2,
-    ylim = c(0, y_max),
-    ylab = "Mean score",
-    main = "RAG Evaluation Metric Means"
+    las    = 2,
+    ylim   = c(0, y_max),
+    ylab   = "Mean score",
+    main   = "RAGAS Metric Means"
   )
 
-  graphics::axis(
-    side = 1,
-    at = bp,
-    labels = names(means),
-    las = 2
-  )
-
-  graphics::grid(
-    nx = NA,
-    ny = NULL
-  )
+  graphics::axis(1, at = bp, labels = names(means), las = 2)
+  graphics::grid(nx = NA, ny = NULL)
 
   invisible(output_path)
 }

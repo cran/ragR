@@ -2,34 +2,29 @@
 
 #' Query the RAG pipeline
 #'
-#' Takes a user question, embeds it, retrieves relevant chunks from a vector
-#' store, constructs a grounded RAG prompt, and calls a large language model
-#' to generate an answer.
+#' Takes a user question, embeds it, retrieves relevant chunks from a vector store,
+#' constructs a grounded RAG prompt, and calls an LLM to generate an answer.
 #'
 #' @param question Character scalar.
-#' @param collection Vector-store collection name.
-#' @param vectorstore_path Character scalar; path to the vector-store RDS file.
+#' @param collection Vector store collection name.
 #' @param top_k Integer; number of chunks to retrieve.
 #' @param embedding_model Character; embedding model for the question.
 #' @param chat_model Character; chat model for answer generation.
 #' @param temperature Numeric; sampling temperature for the chat model.
-#' @param max_output_tokens Integer or NULL; maximum output tokens for the
-#'   chat model.
-#' @param score_threshold Numeric; minimum similarity score to keep a retrieved
-#'   chunk. Applied only if `retrieved` includes a `score` column.
-#' @param system_prompt Character; system instruction passed to the chat model.
+#' @param max_output_tokens Integer or NULL; maximum output tokens for the chat model.
+#' @param score_threshold Numeric; minimum similarity score to keep a retrieved chunk.
+#'   Applied only if `retrieved` includes a `score` column.
+#' @param system_prompt Character; API-level system instruction passed to the chat model.
 #'
 #' @return A list with:
 #'   \item{answer}{Model-generated answer}
-#'   \item{retrieved}{Tibble or data frame of retrieved chunks after filtering}
-#'   \item{prompt}{Final grounded RAG prompt sent to the chat model}
+#'   \item{retrieved}{Tibble/data frame of retrieved chunks after filtering}
+#'   \item{prompt}{Final grounded RAG prompt sent as the user/content prompt}
 #'   \item{model}{Chat model used}
-#'
 #' @export
 query_rag <- function(
   question,
-  collection,
-  vectorstore_path,
+  collection        = "default",
   top_k             = 4L,
   embedding_model   = "text-embedding-3-small",
   chat_model        = "gpt-4o-mini",
@@ -41,58 +36,22 @@ query_rag <- function(
   if (!is.character(question) || length(question) != 1L) {
     stop("question must be a single character string.", call. = FALSE)
   }
-
-  if (
-    !is.character(collection) ||
-      length(collection) != 1L ||
-      !nzchar(collection)
-  ) {
-    stop(
-      "collection must be a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
-  if (
-    missing(vectorstore_path) ||
-      !is.character(vectorstore_path) ||
-      length(vectorstore_path) != 1L ||
-      !nzchar(vectorstore_path)
-  ) {
-    stop(
-      "vectorstore_path must be supplied as a single non-empty character string.",
-      call. = FALSE
-    )
-  }
-
   if (!is.numeric(top_k) || length(top_k) != 1L || top_k <= 0) {
     stop("top_k must be a positive integer.", call. = FALSE)
   }
-
   if (!is.numeric(score_threshold) || length(score_threshold) != 1L) {
     stop("score_threshold must be a single numeric value.", call. = FALSE)
   }
-
   if (!is.numeric(temperature) || length(temperature) != 1L) {
     stop("temperature must be a single numeric value.", call. = FALSE)
   }
-
   if (!is.character(system_prompt) || length(system_prompt) != 1L) {
     stop("system_prompt must be a single character string.", call. = FALSE)
   }
-
   if (!is.null(max_output_tokens)) {
-    if (
-      !is.numeric(max_output_tokens) ||
-        length(max_output_tokens) != 1L ||
-        max_output_tokens <= 0
-    ) {
-      stop(
-        "max_output_tokens must be a single positive integer or NULL.",
-        call. = FALSE
-      )
+    if (!is.numeric(max_output_tokens) || length(max_output_tokens) != 1L || max_output_tokens <= 0) {
+      stop("max_output_tokens must be a single positive integer or NULL.", call. = FALSE)
     }
-
     max_output_tokens <- as.integer(max_output_tokens)
   }
 
@@ -108,15 +67,14 @@ query_rag <- function(
   retrieved <- vectorstore_query(
     collection      = collection,
     query_embedding = query_embedding,
-    top_k           = as.integer(top_k),
-    path            = vectorstore_path
+    top_k           = as.integer(top_k)
   )
 
   if (!is.data.frame(retrieved) || nrow(retrieved) == 0L) {
     stop("vectorstore_query() returned no results.", call. = FALSE)
   }
 
-  # 2b) Optional score-threshold filter
+  # 2b) Optional score threshold filter
   if ("score" %in% names(retrieved)) {
     retrieved <- retrieved[
       !is.na(retrieved$score) & retrieved$score >= score_threshold,
@@ -135,6 +93,7 @@ query_rag <- function(
     retrieved = retrieved
   )
 
+  # Ensure prompt is a single string
   prompt <- as.character(prompt[[1]])
 
   # 4) Call chat model

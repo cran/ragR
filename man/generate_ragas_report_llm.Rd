@@ -2,35 +2,27 @@
 % Please edit documentation in R/ragas_report.R
 \name{generate_ragas_report_llm}
 \alias{generate_ragas_report_llm}
-\title{Generate a RAG evaluation report using large language model scoring}
+\title{Generate RAGAS report using LLM scoring}
 \usage{
 generate_ragas_report_llm(
-  qa_log_path,
-  qa_metrics_path,
-  output_dir,
+  qa_log_path = "db/qa_log.rds",
+  qa_metrics_path = "db/qa_metrics.rds",
+  output_dir = "reports/ragas",
   judge_model = "gpt-4o-mini"
 )
 }
 \arguments{
-\item{qa_log_path}{Character scalar; path to the question-answering log
-RDS file.}
+\item{qa_log_path}{Path to QA log RDS (default: "db/qa_log.rds").}
 
-\item{qa_metrics_path}{Character scalar; path to the metrics RDS output
-file.}
+\item{qa_metrics_path}{Path to metrics RDS output (default: "db/qa_metrics.rds").}
 
-\item{output_dir}{Character scalar; directory where the summary CSV and
-plot PNG are written.}
+\item{output_dir}{Output directory for CSV/PNG (default: "reports/ragas").}
 
-\item{judge_model}{Character scalar; large language model used to score
-the evaluation metrics.}
+\item{judge_model}{Judge model used for LLM scoring (default: "gpt-4o-mini").}
 }
 \value{
-A list containing \code{status}, \code{n_qa}, \code{qa_metrics_path},
-\code{summary_csv_path}, and \code{plot_path}.
+A list with: status, n_qa, qa_metrics_path, summary_csv_path, plot_path.
 }
 \description{
 This is an explicit alias for \code{\link[=generate_ragas_report]{generate_ragas_report()}}.
-}
-\details{
-All input and output locations must be supplied explicitly.
 }

@@ -6,8 +6,7 @@
 \usage{
 query_rag(
   question,
-  collection,
-  vectorstore_path,
+  collection = "default",
   top_k = 4L,
   embedding_model = "text-embedding-3-small",
   chat_model = "gpt-4o-mini",
@@ -20,9 +19,7 @@ query_rag(
 \arguments{
 \item{question}{Character scalar.}
 
-\item{collection}{Vector-store collection name.}
-
-\item{vectorstore_path}{Character scalar; path to the vector-store RDS file.}
+\item{collection}{Vector store collection name.}
 
 \item{top_k}{Integer; number of chunks to retrieve.}
 
@@ -32,23 +29,21 @@ query_rag(
 
 \item{temperature}{Numeric; sampling temperature for the chat model.}
 
-\item{max_output_tokens}{Integer or NULL; maximum output tokens for the
-chat model.}
+\item{max_output_tokens}{Integer or NULL; maximum output tokens for the chat model.}
 
-\item{score_threshold}{Numeric; minimum similarity score to keep a retrieved
-chunk. Applied only if \code{retrieved} includes a \code{score} column.}
+\item{score_threshold}{Numeric; minimum similarity score to keep a retrieved chunk.
+Applied only if \code{retrieved} includes a \code{score} column.}
 
-\item{system_prompt}{Character; system instruction passed to the chat model.}
+\item{system_prompt}{Character; API-level system instruction passed to the chat model.}
 }
 \value{
 A list with:
 \item{answer}{Model-generated answer}
-\item{retrieved}{Tibble or data frame of retrieved chunks after filtering}
-\item{prompt}{Final grounded RAG prompt sent to the chat model}
+\item{retrieved}{Tibble/data frame of retrieved chunks after filtering}
+\item{prompt}{Final grounded RAG prompt sent as the user/content prompt}
 \item{model}{Chat model used}
 }
 \description{
-Takes a user question, embeds it, retrieves relevant chunks from a vector
-store, constructs a grounded RAG prompt, and calls a large language model
-to generate an answer.
+Takes a user question, embeds it, retrieves relevant chunks from a vector store,
+constructs a grounded RAG prompt, and calls an LLM to generate an answer.
 }

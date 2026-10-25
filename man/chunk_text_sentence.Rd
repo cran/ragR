@@ -16,13 +16,3 @@ Character vector; one sentence per element.
 Splits text into individual sentences. Each returned element is intended
 to be exactly one sentence (best-effort based on punctuation).
 }
-\examples{
-text <- paste(
-  "Retrieval-augmented generation retrieves relevant information.",
-  "The retrieved information is then supplied to a language model.",
-  "This can help produce more grounded responses."
-)
-
-chunk_text_sentence(text)
-
-}

@@ -2,34 +2,13 @@
 % Please edit documentation in R/vectorstore_interface.R
 \name{vectorstore_clear_all}
 \alias{vectorstore_clear_all}
-\title{Delete all collections from the R-native vector store}
+\title{Delete ALL collections from the vector store}
 \usage{
-vectorstore_clear_all(path)
-}
-\arguments{
-\item{path}{Character scalar; path to the vector-store RDS file.}
+vectorstore_clear_all()
 }
 \value{
-Invisibly, \code{TRUE}.
+Invisibly, TRUE.
 }
 \description{
-Replaces the vector store with an empty tibble. The vector-store path must
-be supplied explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-embeddings <- matrix(c(1, 0), nrow = 1)
-
-vectorstore_upsert(
-  collection = "example",
-  ids = "doc_1",
-  embeddings = embeddings,
-  documents = "Example document",
-  path = path
-)
-
-vectorstore_clear_all(path)
-vectorstore_load(path)
-
+Completely wipes the vector store by replacing it with an empty tibble.
 }

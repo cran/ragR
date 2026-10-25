@@ -4,58 +4,22 @@
 \alias{vectorstore_upsert}
 \title{Upsert embeddings into the R-native vector store}
 \usage{
-vectorstore_upsert(
-  collection,
-  ids,
-  embeddings,
-  documents,
-  metadatas = NULL,
-  path
-)
+vectorstore_upsert(collection, ids, embeddings, documents, metadatas = NULL)
 }
 \arguments{
-\item{collection}{Character scalar; name of the collection.}
+\item{collection}{Character; name of the collection.}
 
-\item{ids}{Character vector of identifiers, one for each embedding.}
+\item{ids}{Character vector of IDs, one for each embedding.}
 
-\item{embeddings}{Numeric matrix or data frame; one row per identifier.}
+\item{embeddings}{Numeric matrix or data frame; one row per id.}
 
-\item{documents}{Character vector of document text, one element per
-embedding.}
+\item{documents}{Character vector of raw text for each embedding.}
 
-\item{metadatas}{Optional list or data frame containing metadata for each
-row.}
-
-\item{path}{Character scalar; path to the vector-store RDS file.}
+\item{metadatas}{Optional list or data frame of metadata per row.}
 }
 \value{
-Invisibly, \code{TRUE} on success.
+Invisibly, TRUE on success.
 }
 \description{
-Adds new records to a vector store or replaces existing records having the
-same collection and identifier. The vector-store path must be supplied
-explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-embeddings <- matrix(
-  c(
-    1, 0,
-    0, 1
-  ),
-  nrow = 2,
-  byrow = TRUE
-)
-
-vectorstore_upsert(
-  collection = "example",
-  ids = c("doc_1", "doc_2"),
-  embeddings = embeddings,
-  documents = c("First document", "Second document"),
-  path = path
-)
-
-vectorstore_load(path)
-
+Upsert embeddings into the R-native vector store
 }

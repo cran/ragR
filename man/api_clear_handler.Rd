@@ -2,30 +2,17 @@
 % Please edit documentation in R/api_handlers.R
 \name{api_clear_handler}
 \alias{api_clear_handler}
-\title{API handler: clear a vector-store collection}
+\title{API handler: clear one vector-store collection}
 \usage{
-api_clear_handler(body, vectorstore_path)
+api_clear_handler(body = NULL)
 }
 \arguments{
-\item{body}{A list parsed from a JSON request body, or \code{NULL}.}
-
-\item{vectorstore_path}{Character scalar; path to the vector-store RDS file.}
+\item{body}{Parsed JSON request body, or NULL.}
 }
 \value{
-A list suitable for JSON serialization, containing \code{status},
-\code{collection}, and \code{message}.
+A list with \code{status}, \code{collection}, and \code{message}.
 }
 \description{
-Deletes a collection from the R-native vector store. The request body may
-specify a collection name; otherwise, \code{"default"} is used. The vector-store
-path must be supplied explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-api_clear_handler(
-  body = list(collection = "example"),
-  vectorstore_path = path
-)
-
+This handler deletes one collection from the R-native vector store.
+If no collection is supplied, \code{"default"} is used.
 }

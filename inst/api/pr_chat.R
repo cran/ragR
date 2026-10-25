@@ -6,7 +6,7 @@ library(ragR)
 #* Ask a question using the RAG pipeline
 #*
 #* This endpoint sends a question to the RAG pipeline, returns the model answer,
-#* and logs the question-answer interaction in the QA log.
+#* and logs the Q/A interaction into the QA log.
 #*
 #* Example JSON body:
 #* {
@@ -17,35 +17,17 @@ library(ragR)
 #*
 #* @post /chat
 #* @serializer json
-function(qa_log_path, vectorstore_path) {
-  force(qa_log_path)
-  force(vectorstore_path)
-
-  function(req) {
-    if (is.null(req$postBody) || !nzchar(req$postBody)) {
-      stop(
-        "Request body must be non-empty JSON.",
-        call. = FALSE
-      )
-    }
-
-    body <- tryCatch(
-      jsonlite::fromJSON(
-        req$postBody,
-        simplifyVector = FALSE
-      ),
-      error = function(e) {
-        stop(
-          "Request body must be valid JSON.",
-          call. = FALSE
-        )
-      }
-    )
-
-    ragR::api_chat_handler(
-      body = body,
-      qa_log_path = qa_log_path,
-      vectorstore_path = vectorstore_path
-    )
+function(req) {
+  if (is.null(req$postBody) || !nzchar(req$postBody)) {
+    stop("Request body must be non-empty JSON.", call. = FALSE)
   }
+
+  body <- tryCatch(
+    jsonlite::fromJSON(req$postBody, simplifyVector = FALSE),
+    error = function(e) {
+      stop("Request body must be valid JSON.", call. = FALSE)
+    }
+  )
+
+  ragR::api_chat_handler(body)
 }

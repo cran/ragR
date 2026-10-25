@@ -4,10 +4,11 @@
 \alias{clear_qa_metrics}
 \title{Clear QA metrics on disk}
 \usage{
-clear_qa_metrics(path)
+clear_qa_metrics(path = "db/qa_metrics.rds")
 }
 \arguments{
-\item{path}{Character scalar; path to the QA metrics RDS file.}
+\item{path}{Character scalar; path to the QA metrics RDS file. Defaults to
+\code{"db/qa_metrics.rds"}.}
 }
 \value{
 Invisibly, the path to the saved file.
@@ -15,11 +16,4 @@ Invisibly, the path to the saved file.
 \description{
 This helper overwrites the QA metrics file with an empty metrics tibble,
 as created by \code{\link[=qa_metrics_empty]{qa_metrics_empty()}}.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-clear_qa_metrics(path)
-load_qa_metrics(path)
-
 }

@@ -4,26 +4,14 @@
 \alias{vectorstore_load}
 \title{Load the R-native vector store}
 \usage{
-vectorstore_load(path)
-}
-\arguments{
-\item{path}{Character scalar; path to the vector-store RDS file.}
+vectorstore_load()
 }
 \value{
-A tibble with one row per stored chunk, or zero rows if the store
-does not yet exist.
+A tibble with one row per stored chunk, or zero rows if the store is empty.
 }
 \description{
-Loads the current contents of an R-native vector store from an RDS file.
-If the file does not exist, the function returns an empty tibble with the
-expected columns: \code{collection}, \code{id}, \code{text}, \code{embedding}, and \code{metadata}.
-}
-\details{
-The vector-store path must be supplied explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-vectorstore_load(path)
-
+This function loads the current contents of the R-native vector store
+from \code{db/vectorstore.rds}. If the file does not exist yet, it returns
+an empty tibble with the expected columns:
+\code{collection}, \code{id}, \code{text}, \code{embedding}, and \code{metadata}.
 }

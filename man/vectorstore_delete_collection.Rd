@@ -4,38 +4,14 @@
 \alias{vectorstore_delete_collection}
 \title{Delete a collection from the R-native vector store}
 \usage{
-vectorstore_delete_collection(collection, path)
+vectorstore_delete_collection(collection)
 }
 \arguments{
-\item{collection}{Character scalar; name of the collection to delete.}
-
-\item{path}{Character scalar; path to the vector-store RDS file.}
+\item{collection}{Character; collection name to delete.}
 }
 \value{
-Invisibly, \code{TRUE} on success.
+Invisibly, TRUE on success.
 }
 \description{
-Removes all stored records belonging to a specified collection. The
-vector-store path must be supplied explicitly.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-embeddings <- matrix(c(1, 0), nrow = 1)
-
-vectorstore_upsert(
-  collection = "example",
-  ids = "doc_1",
-  embeddings = embeddings,
-  documents = "Example document",
-  path = path
-)
-
-vectorstore_delete_collection(
-  collection = "example",
-  path = path
-)
-
-vectorstore_load(path)
-
+Delete a collection from the R-native vector store
 }

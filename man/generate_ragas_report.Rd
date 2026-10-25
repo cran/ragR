@@ -2,42 +2,32 @@
 % Please edit documentation in R/ragas_report.R
 \name{generate_ragas_report}
 \alias{generate_ragas_report}
-\title{Generate a RAG evaluation performance report}
+\title{Generate a RAGAS performance report}
 \usage{
 generate_ragas_report(
-  qa_log_path,
-  qa_metrics_path,
-  output_dir,
+  qa_log_path = "db/qa_log.rds",
+  qa_metrics_path = "db/qa_metrics.rds",
+  output_dir = "reports/ragas",
   judge_model = "gpt-4o-mini"
 )
 }
 \arguments{
-\item{qa_log_path}{Character scalar; path to the question-answering log
-RDS file.}
+\item{qa_log_path}{Path to QA log RDS (default: "db/qa_log.rds").}
 
-\item{qa_metrics_path}{Character scalar; path to the metrics RDS output
-file.}
+\item{qa_metrics_path}{Path to metrics RDS output (default: "db/qa_metrics.rds").}
 
-\item{output_dir}{Character scalar; directory where the summary CSV and
-plot PNG are written.}
+\item{output_dir}{Output directory for CSV/PNG (default: "reports/ragas").}
 
-\item{judge_model}{Character scalar; large language model used to score
-the evaluation metrics.}
+\item{judge_model}{Judge model used for LLM scoring (default: "gpt-4o-mini").}
 }
 \value{
-A list containing \code{status}, \code{n_qa}, \code{qa_metrics_path},
-\code{summary_csv_path}, and \code{plot_path}.
+A list with: status, n_qa, qa_metrics_path, summary_csv_path, plot_path.
 }
 \description{
-Loads a question-answering log from disk, computes large language model
-evaluation metrics, and writes:
-}
-\details{
+Loads a QA log from disk, computes LLM-scored RAGAS-style metrics, and writes:
 \itemize{
-\item metrics to an RDS file;
-\item a summary to \code{ragas_summary.csv};
-\item a bar plot of mean metrics to \code{ragas_means.png}.
+\item metrics RDS (qa_metrics_path)
+\item summary CSV (ragas_summary.csv)
+\item means bar plot PNG (ragas_means.png)
 }
-
-All input and output locations must be supplied explicitly.
 }

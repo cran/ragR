@@ -2,34 +2,32 @@
 % Please edit documentation in R/api_handlers.R
 \name{api_ragas_report_handler}
 \alias{api_ragas_report_handler}
-\title{API handler: generate a RAG evaluation performance report}
+\title{API handler: generate RAGAS performance report}
 \usage{
 api_ragas_report_handler(
-  qa_log_path,
-  qa_metrics_path,
-  output_dir,
+  qa_log_path = "db/qa_log.rds",
+  qa_metrics_path = "db/qa_metrics.rds",
+  output_dir = "reports/ragas",
   judge_model = "gpt-4o-mini"
 )
 }
 \arguments{
-\item{qa_log_path}{Character scalar; path to the question-answering log
-RDS file.}
+\item{qa_log_path}{Character scalar; path to the QA log RDS file.
+Defaults to \code{"db/qa_log.rds"}.}
 
-\item{qa_metrics_path}{Character scalar; path to the metrics RDS output
-file.}
+\item{qa_metrics_path}{Character scalar; path to the QA metrics RDS file.
+Defaults to \code{"db/qa_metrics.rds"}.}
 
-\item{output_dir}{Character scalar; directory where the summary CSV and
-plot PNG are written.}
+\item{output_dir}{Character scalar; directory where outputs are written.
+Defaults to \code{"reports/ragas"}.}
 
-\item{judge_model}{Character scalar; large language model used to score
-the evaluation metrics.}
+\item{judge_model}{Character scalar; judge model used for LLM-scored metrics.
+Defaults to \code{"gpt-4o-mini"}.}
 }
 \value{
-A list containing \code{status}, \code{n_qa}, \code{qa_metrics_path},
-\code{summary_csv_path}, and \code{plot_path}. If the QA log is empty, the returned
-list instead includes an explanatory \code{message}.
+A list with \code{status}, \code{n_qa}, \code{qa_metrics_path},
+\code{summary_csv_path}, and \code{plot_path}.
 }
 \description{
-Loads a saved question-answering log, computes evaluation metrics, and
-writes the metrics, summary CSV, and plot to explicitly supplied locations.
+API handler: generate RAGAS performance report
 }

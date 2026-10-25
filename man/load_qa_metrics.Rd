@@ -4,10 +4,11 @@
 \alias{load_qa_metrics}
 \title{Load QA metrics from disk}
 \usage{
-load_qa_metrics(path)
+load_qa_metrics(path = "db/qa_metrics.rds")
 }
 \arguments{
-\item{path}{Character scalar; path to the RDS file.}
+\item{path}{Character scalar; path to the RDS file. Defaults to
+\code{"db/qa_metrics.rds"}.}
 }
 \value{
 A tibble containing the QA metrics.
@@ -15,10 +16,4 @@ A tibble containing the QA metrics.
 \description{
 This helper loads QA metrics from an RDS file. If the file does not
 exist, it returns an empty metrics tibble created by \code{\link[=qa_metrics_empty]{qa_metrics_empty()}}.
-}
-\examples{
-path <- tempfile(fileext = ".rds")
-
-load_qa_metrics(path)
-
 }
